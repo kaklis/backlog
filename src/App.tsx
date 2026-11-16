@@ -14,6 +14,8 @@ import { ColumnView } from './components/Column'
 import { BoardIcon, DownloadIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, UploadIcon } from './components/Icons'
 import { CardView } from './components/Card'
 import { CardDialog } from './components/CardDialog'
+import { BackupMenu } from './components/BackupMenu'
+import { backupSupported, useFileBackup } from './backup'
 
 type Filter = Priority | 'none' | 'all'
 type Sort = 'manual' | 'priority' | 'due'
@@ -87,6 +89,7 @@ function useTheme() {
 export default function App() {
   const { state, dispatch: rawDispatch } = useBoard()
   const [theme, toggleTheme] = useTheme()
+  const backup = useFileBackup(state, rawDispatch)
   // deleted cards, newest last, kept for undo; the toast shows briefly after each delete
   const [trash, setTrash] = useState<{ card: Card; index: number }[]>([])
   const [toast, setToast] = useState(false)
@@ -251,6 +254,7 @@ export default function App() {
             <option value="due">Sort: Due date</option>
           </select>
           <span className="divider" />
+          {backupSupported && <BackupMenu backup={backup} />}
           <button className="ghost" onClick={exportBoard}><DownloadIcon />Export</button>
           <button className="ghost" onClick={() => importRef.current?.click()}><UploadIcon />Import</button>
           <input

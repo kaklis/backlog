@@ -40,6 +40,9 @@ export const ChecklistIcon = (p: SVGProps<SVGSVGElement>) => (
 export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p, 15)}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
 )
+export const SaveIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p, 15)}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
+)
 export const DownloadIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p, 15)}><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
 )

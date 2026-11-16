@@ -43,6 +43,7 @@ npm run preview  # serve the production build locally
 
 **Other**
 - ☾ / ☀ toggles dark mode. Until you choose, it follows your OS setting.
+- **Backup** (Chrome, Edge and other Chromium browsers) keeps a JSON file on your computer in sync automatically. Choose a file once; it is rewritten shortly after every change. After a browser restart it may ask you to click **Reconnect** to re-grant access. If the board is empty but the file has cards (e.g. site data was cleared), it offers to restore instead of overwriting. A file that isn't a Backlog backup is never overwritten. Firefox and Safari don't support this, so use Export there.
 - **Export** downloads the board as `backlog-YYYY-MM-DD.json`. **Import** replaces the current board with an exported file (after confirmation; invalid files are rejected without changes).
 
 ## Keyboard shortcuts
@@ -56,7 +57,7 @@ npm run preview  # serve the production build locally
 
 ## Data and storage
 
-Everything is stored in this browser under these `localStorage` keys: `backlog.v1` (board), `backlog.filter`, `backlog.sort`, `backlog.theme`. Clearing site data erases the board, so use Export for backups. Data is not shared between browsers or devices; use Export / Import to move it.
+Everything is stored in this browser under these `localStorage` keys: `backlog.v1` (board), `backlog.filter`, `backlog.sort`, `backlog.theme`. Clearing site data erases the board, so turn on file backup (or use Export). Data is not shared between browsers or devices; use Export / Import to move it.
 
 ## Project layout
 
@@ -68,6 +69,8 @@ src/
   components/Column.tsx column with card list and add box
   components/Card.tsx   sortable card
   components/CardDialog.tsx  card detail dialog (notes, tags, checklist)
+  backup.ts             file backup (File System Access API + IndexedDB handle)
+  components/BackupMenu.tsx  backup status and controls
   tags.ts               tag color + normalization helpers
   styles.css            theme variables (light/dark) and layout
 ```
