@@ -30,9 +30,7 @@ jobs:
       - name: Surface unit test failures
         if: failure()
         run: |
-          msg=$(grep -vE '^\s*$' unit.log | head -c 2500 | sed ':a;N;$!ba;s/%/%25/g;s///g;s/
-/%0A/g')
-          echo "::error title=Unit test output::$msg"
+          python3 -c "t=open('unit.log',errors='replace').read()[-2500:]; print('::error title=Unit test output::'+t.replace('%','%25').replace(chr(13),'').replace(chr(10),'%0A'))"
       - name: Install Playwright's Chromium
         run: npx playwright install --with-deps chromium
       - name: End-to-end tests
