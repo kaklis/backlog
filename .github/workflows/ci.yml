@@ -26,7 +26,13 @@ jobs:
       - name: Type-check and build
         run: npm run build
       - name: Unit and component tests
-        run: npx vitest run --reporter=default --reporter=github-actions
+        run: npx vitest run 2>&1 | tee unit.log; exit ${PIPESTATUS[0]}
+      - name: Surface unit test failures
+        if: failure()
+        run: |
+          msg=$(grep -vE '^\s*$' unit.log | head -c 2500 | sed ':a;N;$!ba;s/%/%25/g;s///g;s/
+/%0A/g')
+          echo "::error title=Unit test output::$msg"
       - name: Install Playwright's Chromium
         run: npx playwright install --with-deps chromium
       - name: End-to-end tests
