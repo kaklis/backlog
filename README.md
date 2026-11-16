@@ -93,6 +93,13 @@ This works as a normal web page. Browsers only allow service workers and install
 3. Open the URL on your phone and install it: Chrome on Android, menu → *Install app*; Safari on iPhone, Share → *Add to Home Screen*.
 4. It then opens full-screen and works offline. The host only serves the app code; your cards stay in your phone's browser.
 
+**Option 3: GitHub Pages (automatic)**
+
+`.github/workflows/ci.yml` runs on every push and pull request: type-check and build, unit tests, then the Playwright suite in Chromium. On pushes to `main`, if everything passes, it publishes `dist/` to GitHub Pages. One-time setup:
+1. Create a GitHub repository, then `git remote add origin <url>` and `git push -u origin main`.
+2. In the repository go to **Settings → Pages** and set **Source** to **GitHub Actions**.
+3. After the first successful run the site is at `https://<user>.github.io/<repo>/`. Open that on your phone and install it as in Option 2.
+
 **Moving data between devices**
 - Use **Data → Export JSON** on one device and **Import** on the other. JSON replaces the board you import into; a CSV import adds cards instead.
 - File backup only works in desktop Chromium browsers, not on phones, and clearing site data erases the phone's board, so export now and then.
