@@ -37,7 +37,9 @@ The e2e tests use the Edge/Chrome already installed on your machine. To use Play
 - **Tags:** type a tag and press Enter or comma; Backspace removes the last one. Tags get a color from their name and appear on the card.
 - **Checklists:** add items, tick them off, edit or remove them. Cards show progress such as 2/5.
 - Drag cards within a column or between columns.
-- Hover a card and click × to delete it. A toast offers **Undo**, or press Ctrl/Cmd+Z (last 20 deletes this session).
+- Hover a card and click × to delete it.
+- **Archive** a card from its dialog (or press `a`), or archive every card shown in a column with the archive icon in its header. Archived cards leave the board but are kept; open **Archive** in the top bar to restore or permanently delete them.
+- **Undo / redo** (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or Ctrl+Y) covers every change: adds, edits, moves, a whole drag, archive, deleting cards or columns, and imports. Deletes and archives also show an **Undo** toast. History lasts for the session (up to 100 steps).
 
 **Columns**
 - Click a column name to rename it. × deletes the column and its cards (asks first if it has cards).
@@ -57,12 +59,28 @@ The e2e tests use the Edge/Chrome already installed on your machine. To use Play
 
 ## Keyboard shortcuts
 
+Press `?` in the app for this list.
+
 | Key | Action |
 | --- | --- |
-| `/` | Focus search (when not typing in a field) |
-| Ctrl/Cmd + K | Focus search |
-| Ctrl/Cmd + Z | Undo last card delete (when not typing in a field) |
-| Esc | Clear search / close the card dialog without saving |
+| `/` or Ctrl/Cmd + K | Focus search |
+| `n` | New card (in the focused card's column, else the first) |
+| Ctrl/Cmd + Z | Undo |
+| Ctrl/Cmd + Shift + Z, or Ctrl + Y | Redo |
+| `?` | Show shortcuts |
+| Esc | Clear search / close a dialog without saving |
+
+With a card focused (Tab to one):
+
+| Key | Action |
+| --- | --- |
+| ↑ ↓ / ← → | Move focus between cards / columns |
+| Shift + ↑ ↓ | Reorder within the column (manual sort only) |
+| Shift + ← → | Move to the previous / next column |
+| Enter or `e` | Open details |
+| `1` `2` `3` `0` | Priority high / medium / low / none |
+| `a` | Archive |
+| `x` or Delete | Delete (undoable) |
 
 ## Data and storage
 
@@ -80,6 +98,9 @@ src/
   components/CardDialog.tsx  card detail dialog (notes, tags, checklist)
   backup.ts             file backup (File System Access API + IndexedDB handle)
   components/BackupMenu.tsx  backup status and controls
+  components/ArchivePanel.tsx  archived cards: restore / delete
+  components/ShortcutsHelp.tsx keyboard shortcut list
+  hooks.ts              usePersisted, useTheme
   tags.ts               tag color + normalization helpers
   test/setup.ts         Vitest setup (jsdom polyfills)
   *.test.ts(x)          unit and component tests

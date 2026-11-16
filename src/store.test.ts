@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseBoard, reducer, type BoardState, type Card } from './store'
+import { historyReducer, parseBoard, reducer, type BoardState, type Card } from './store'
 
 const card = (id: string, columnId = 'a', extra: Partial<Card> = {}): Card => ({
   id,
@@ -90,28 +90,6 @@ describe('reducer', () => {
     const next = board([card('z')])
     expect(reducer(board([card('x')]), { type: 'replace', state: next })).toBe(next)
   })
-
-  describe('restoreCard', () => {
-    it('re-inserts at the original index', () => {
-      const s = reducer(board([card('1'), card('3')]), { type: 'restoreCard', card: card('2'), index: 1 })
-      expect(ids(s)).toEqual(['1', '2', '3'])
-    })
-
-    it('clamps an index past the end', () => {
-      const s = reducer(board([card('1')]), { type: 'restoreCard', card: card('2'), index: 9 })
-      expect(ids(s)).toEqual(['1', '2'])
-    })
-
-    it('skips cards whose column no longer exists', () => {
-      const s = board([card('1')])
-      expect(reducer(s, { type: 'restoreCard', card: card('2', 'gone'), index: 0 })).toBe(s)
-    })
-
-    it('does not duplicate a card that is already present', () => {
-      const s = board([card('1')])
-      expect(reducer(s, { type: 'restoreCard', card: card('1'), index: 0 })).toBe(s)
-    })
-  })
 })
 
 describe('parseBoard', () => {
@@ -181,5 +159,105 @@ describe('parseBoard', () => {
     expect(s.cards[0].checklist![0]).toMatchObject({ text: 'a', done: true })
     expect(s.cards[0].checklist![0].id).toBeTruthy()
     expect(s.cards[0].checklist![1]).toEqual({ id: 'k', text: 'b', done: false })
+  })
+})
+
+describe('archive', () => {
+  it('archives and restores a single card, keeping its column and position', () => {
+    const start = board([card('1'), card('2'), card('3')])
+    const archived = reducer(start, { type: 'archiveCard', id: '2' })
+    expect(archived.cards.find((c) => c.id === '2')!.archivedAt).toBeTypeOf('number')
+    expect(archived.cards.map((c) => c.id)).toEqual(['1', '2', '3'])
+    const back = reducer(archived, { type: 'unarchiveCard', id: '2' })
+    expect(back.cards.find((c) => c.id === '2')!.archivedAt).toBeUndefined()
+    expect(back.cards.find((c) => c.id === '2')!.columnId).toBe('a')
+  })
+
+  it('archives several cards at once and leaves the rest alone', () => {
+    const s = reducer(board([card('1'), card('2'), card('3', 'b')]), { type: 'archiveCards', ids: ['1', '3'] })
+    expect(s.cards.map((c) => !!c.archivedAt)).toEqual([true, false, true])
+  })
+
+  it('keeps the original timestamp when archiving twice', () => {
+    const once = reducer(board([card('1', 'a', { archivedAt: 123 })]), { type: 'archiveCard', id: '1' })
+    expect(once.cards[0].archivedAt).toBe(123)
+  })
+
+  it('survives an import round trip', () => {
+    const original = board([card('1', 'a', { archivedAt: 5 })])
+    expect(parseBoard(JSON.parse(JSON.stringify(original)))).toEqual(original)
+  })
+})
+
+describe('undo history', () => {
+  const start: ReturnType<typeof historyReducer> = { present: board([card('1'), card('2')]), past: [], future: [] }
+  const run = (h: ReturnType<typeof historyReducer>, ...actions: Parameters<typeof historyReducer>[1][]) =>
+    actions.reduce(historyReducer, h)
+
+  it('undoes and redoes a change', () => {
+    const changed = run(start, { type: 'deleteCard', id: '1' })
+    expect(ids(changed.present)).toEqual(['2'])
+    const undone = run(changed, { type: 'undo' })
+    expect(ids(undone.present)).toEqual(['1', '2'])
+    expect(ids(run(undone, { type: 'redo' }).present)).toEqual(['2'])
+  })
+
+  it('undoes step by step in reverse order', () => {
+    const h = run(start, { type: 'deleteCard', id: '1' }, { type: 'deleteCard', id: '2' })
+    expect(ids(run(h, { type: 'undo' }).present)).toEqual(['2'])
+    expect(ids(run(h, { type: 'undo' }, { type: 'undo' }).present)).toEqual(['1', '2'])
+  })
+
+  it('does nothing when there is nothing to undo or redo', () => {
+    expect(run(start, { type: 'undo' })).toBe(start)
+    expect(run(start, { type: 'redo' })).toBe(start)
+  })
+
+  it('a new change after undo clears the redo stack', () => {
+    const h = run(start, { type: 'deleteCard', id: '1' }, { type: 'undo' }, { type: 'deleteCard', id: '2' })
+    expect(h.future).toEqual([])
+    expect(run(h, { type: 'redo' })).toBe(h)
+  })
+
+  it('does not record actions that change nothing', () => {
+    expect(run(start, { type: 'moveCard', id: '1', columnId: 'a', overId: '2' }).past.length).toBe(1) // a real move
+    // card 2 is already last in column a, so appending it there changes nothing
+    expect(run(start, { type: 'moveCard', id: '2', columnId: 'a' }).past.length).toBe(0)
+    expect(run(start, { type: 'deleteCard', id: 'missing' }).past.length).toBe(0)
+  })
+
+  it('undoes deleting a column together with its cards', () => {
+    const h = run(start, { type: 'deleteColumn', id: 'a' })
+    expect(h.present.cards).toHaveLength(0)
+    expect(ids(run(h, { type: 'undo' }).present)).toEqual(['1', '2'])
+  })
+
+  it('treats a whole drag as one undo step', () => {
+    let h = run(start, { type: 'beginDrag' })
+    h = run(h, { type: 'moveCard', id: '1', columnId: 'b', transient: true })
+    h = run(h, { type: 'moveCard', id: '1', columnId: 'b', overId: '2', transient: true })
+    h = run(h, { type: 'endDrag', cancelled: false })
+    expect(h.present.cards.find((c) => c.id === '1')!.columnId).toBe('b')
+    expect(h.past).toHaveLength(1)
+    expect(run(h, { type: 'undo' }).present).toBe(start.present)
+  })
+
+  it('rolls a cancelled drag back without leaving an undo step', () => {
+    let h = run(start, { type: 'beginDrag' })
+    h = run(h, { type: 'moveCard', id: '1', columnId: 'b', transient: true })
+    h = run(h, { type: 'endDrag', cancelled: true })
+    expect(h.present).toBe(start.present)
+    expect(h.past).toHaveLength(0)
+  })
+
+  it('a drag that ends where it started leaves no undo step', () => {
+    const h = run(start, { type: 'beginDrag' }, { type: 'endDrag', cancelled: false })
+    expect(h.past).toHaveLength(0)
+  })
+
+  it('caps the history length', () => {
+    let h = start
+    for (let i = 0; i < 150; i++) h = run(h, { type: 'addCard', columnId: 'a', title: `t${i}` })
+    expect(h.past.length).toBe(100)
   })
 })

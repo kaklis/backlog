@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer } from 'react'
 
 export interface Card {
   id: string
@@ -8,6 +8,7 @@ export interface Card {
   due?: string // YYYY-MM-DD
   tags?: string[]
   checklist?: ChecklistItem[]
+  archivedAt?: number // set when the card is archived; hidden from the board
   columnId: string
   createdAt: number
 }
@@ -26,16 +27,19 @@ export interface BoardState {
   cards: Card[]
 }
 
-type Action =
+export type Action =
   | { type: 'addCard'; columnId: string; title: string }
   | { type: 'updateCard'; id: string; patch: Partial<Omit<Card, 'id' | 'columnId' | 'createdAt'>> }
   | { type: 'deleteCard'; id: string }
-  | { type: 'moveCard'; id: string; columnId: string; overId?: string }
+  | { type: 'archiveCard'; id: string }
+  | { type: 'unarchiveCard'; id: string }
+  | { type: 'archiveCards'; ids: string[] }
+  // transient moves (during a drag) are not recorded in undo history; the drag as a whole is one step (beginDrag/endDrag)
+  | { type: 'moveCard'; id: string; columnId: string; overId?: string; transient?: boolean }
   | { type: 'addColumn'; name: string }
   | { type: 'renameColumn'; id: string; name: string }
   | { type: 'deleteColumn'; id: string }
   | { type: 'replace'; state: BoardState }
-  | { type: 'restoreCard'; card: Card; index: number }
 
 const KEY = 'backlog.v1'
 export const uid = () => Math.random().toString(36).slice(2, 10)
@@ -104,6 +108,7 @@ export function parseBoard(data: unknown): BoardState {
       priority: PRIORITIES.includes(c.priority as string) ? (c.priority as Priority) : undefined,
       tags: parseTags(c.tags),
       checklist: parseChecklist(c.checklist),
+      archivedAt: typeof c.archivedAt === 'number' ? c.archivedAt : undefined,
       due: typeof c.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.due) ? c.due : undefined,
     }
   })
@@ -114,12 +119,6 @@ export function reducer(s: BoardState, a: Action): BoardState {
   switch (a.type) {
     case 'replace':
       return a.state
-    case 'restoreCard': {
-      // skip if its column was deleted or the card is already back
-      if (!s.columns.some((c) => c.id === a.card.columnId) || s.cards.some((c) => c.id === a.card.id)) return s
-      const at = Math.min(a.index, s.cards.length)
-      return { ...s, cards: [...s.cards.slice(0, at), a.card, ...s.cards.slice(at)] }
-    }
     case 'addCard':
       return {
         ...s,
@@ -131,21 +130,33 @@ export function reducer(s: BoardState, a: Action): BoardState {
         cards: s.cards.map((c) => (c.id === a.id ? { ...c, ...a.patch } : c)),
       }
     case 'deleteCard':
-      return { ...s, cards: s.cards.filter((c) => c.id !== a.id) }
+      return s.cards.some((c) => c.id === a.id) ? { ...s, cards: s.cards.filter((c) => c.id !== a.id) } : s
+    case 'archiveCard':
+      return { ...s, cards: s.cards.map((c) => (c.id === a.id && !c.archivedAt ? { ...c, archivedAt: Date.now() } : c)) }
+    case 'unarchiveCard':
+      return { ...s, cards: s.cards.map((c) => (c.id === a.id ? { ...c, archivedAt: undefined } : c)) }
+    case 'archiveCards': {
+      const now = Date.now()
+      const ids = new Set(a.ids)
+      return { ...s, cards: s.cards.map((c) => (ids.has(c.id) && !c.archivedAt ? { ...c, archivedAt: now } : c)) }
+    }
     case 'moveCard': {
       const card = s.cards.find((c) => c.id === a.id)
       if (!card) return s
       const rest = s.cards.filter((c) => c.id !== a.id)
       const moved = { ...card, columnId: a.columnId }
       const overIdx = a.overId ? rest.findIndex((c) => c.id === a.overId) : -1
+      let cards: Card[]
       if (overIdx >= 0) {
         // dragging down within a column lands after the target, otherwise before
         const origIdx = s.cards.findIndex((c) => c.id === a.id)
         const origOver = s.cards.findIndex((c) => c.id === a.overId)
         const at = card.columnId === a.columnId && origIdx < origOver ? overIdx + 1 : overIdx
-        return { ...s, cards: [...rest.slice(0, at), moved, ...rest.slice(at)] }
-      }
-      return { ...s, cards: [...rest, moved] }
+        cards = [...rest.slice(0, at), moved, ...rest.slice(at)]
+      } else cards = [...rest, moved]
+      // a drop that changes nothing must not count as a change (keeps undo history clean)
+      const same = card.columnId === a.columnId && cards.every((c, i) => c.id === s.cards[i].id)
+      return same ? s : { ...s, cards }
     }
     case 'addColumn':
       return { ...s, columns: [...s.columns, { id: uid(), name: a.name }] }
@@ -159,8 +170,62 @@ export function reducer(s: BoardState, a: Action): BoardState {
   }
 }
 
+interface History {
+  present: BoardState
+  past: BoardState[]
+  future: BoardState[]
+}
+type HistoryAction =
+  | Action
+  | { type: 'undo' }
+  | { type: 'redo' }
+  | { type: 'beginDrag' }
+  | { type: 'endDrag'; cancelled: boolean }
+const MAX_HISTORY = 100
+
+/** Wraps the board reducer with undo/redo. Every board change is one undo step, except transient moves. */
+export function historyReducer(h: History, a: HistoryAction): History {
+  const { present } = h
+  // snapshots identical to the present (e.g. a drag that ended where it started) are skipped
+  const trim = (list: BoardState[]) => {
+    let i = list.length
+    while (i > 0 && list[i - 1] === present) i--
+    return list.slice(0, i)
+  }
+  switch (a.type) {
+    case 'undo': {
+      const past = trim(h.past)
+      if (!past.length) return h
+      return { present: past[past.length - 1], past: past.slice(0, -1), future: [present, ...h.future] }
+    }
+    case 'redo': {
+      let i = 0
+      while (i < h.future.length && h.future[i] === present) i++
+      const future = h.future.slice(i)
+      if (!future.length) return h
+      return { present: future[0], past: [...h.past, present], future: future.slice(1) }
+    }
+    case 'beginDrag':
+      return { ...h, past: [...h.past, present].slice(-MAX_HISTORY) }
+    case 'endDrag': {
+      const top = h.past[h.past.length - 1]
+      if (!top) return h
+      // cancelled: roll back whatever the drag changed; finished without change: drop the empty step
+      if (a.cancelled) return { ...h, present: top, past: h.past.slice(0, -1) }
+      return top === present ? { ...h, past: h.past.slice(0, -1) } : h
+    }
+    default: {
+      const next = reducer(present, a)
+      if (next === present) return h
+      if (a.type === 'moveCard' && a.transient) return { ...h, present: next, future: [] }
+      return { present: next, past: [...h.past, present].slice(-MAX_HISTORY), future: [] }
+    }
+  }
+}
+
 export function useBoard() {
-  const [state, dispatch] = useReducer(reducer, undefined, load)
+  const [h, dispatchH] = useReducer(historyReducer, undefined, () => ({ present: load(), past: [], future: [] }))
+  const state = h.present
   useEffect(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify(state))
@@ -168,7 +233,12 @@ export function useBoard() {
       /* ignore */
     }
   }, [state])
-  return { state, dispatch }
+  const dispatch = useCallback((a: Action) => dispatchH(a), [])
+  const undo = useCallback(() => dispatchH({ type: 'undo' }), [])
+  const redo = useCallback(() => dispatchH({ type: 'redo' }), [])
+  const beginDrag = useCallback(() => dispatchH({ type: 'beginDrag' }), [])
+  const endDrag = useCallback((cancelled: boolean) => dispatchH({ type: 'endDrag', cancelled }), [])
+  return { state, dispatch, undo, redo, beginDrag, endDrag }
 }
 
-export type Dispatch = ReturnType<typeof useBoard>['dispatch']
+export type Dispatch = (a: Action) => void

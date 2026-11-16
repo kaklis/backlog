@@ -3,9 +3,21 @@ import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Card, Column as ColumnT, Dispatch } from '../store'
 import { CardView } from './Card'
-import { XIcon } from './Icons'
+import { ArchiveIcon, XIcon } from './Icons'
 
-export function ColumnView({ column, cards, dispatch, onOpen }: { column: ColumnT; cards: Card[]; dispatch: Dispatch; onOpen: (id: string) => void }) {
+export function ColumnView({
+  column,
+  cards,
+  totalCount,
+  dispatch,
+  onOpen,
+}: {
+  column: ColumnT
+  cards: Card[] // the cards currently shown (after search / filters)
+  totalCount: number // every card in the column, including hidden and archived ones
+  dispatch: Dispatch
+  onOpen: (id: string) => void
+}) {
   const [draft, setDraft] = useState('')
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
@@ -17,13 +29,13 @@ export function ColumnView({ column, cards, dispatch, onOpen }: { column: Column
   }
 
   const remove = () => {
-    if (cards.length === 0 || confirm(`Delete "${column.name}" and its ${cards.length} cards?`)) {
+    if (totalCount === 0 || confirm(`Delete "${column.name}" and its ${totalCount} cards (including any archived)?`)) {
       dispatch({ type: 'deleteColumn', id: column.id })
     }
   }
 
   return (
-    <section className={`column${isOver ? ' over' : ''}`} aria-label={column.name}>
+    <section className={`column${isOver ? ' over' : ''}`} aria-label={column.name} data-column-id={column.id}>
       <header>
         <input
           className="col-name"
@@ -33,6 +45,15 @@ export function ColumnView({ column, cards, dispatch, onOpen }: { column: Column
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
         <span className="count">{cards.length}</span>
+        <button
+          className="icon"
+          aria-label="Archive all cards in column"
+          title="Archive all cards"
+          disabled={cards.length === 0}
+          onClick={() => dispatch({ type: 'archiveCards', ids: cards.map((c) => c.id) })}
+        >
+          <ArchiveIcon />
+        </button>
         <button className="icon" aria-label="Delete column" title="Delete column" onClick={remove}><XIcon /></button>
       </header>
       <div ref={setNodeRef} className="cards">

@@ -100,3 +100,43 @@ test('dark mode toggle persists', async ({ page }) => {
   await page.reload()
   expect(await theme()).toBe(first)
 })
+
+test('a drag is a single undo step, and a cancelled drag changes nothing', async ({ page }) => {
+  await addCard(page, 'Backlog', 'A')
+  await addCard(page, 'Backlog', 'B')
+  await page.locator('body').click({ position: { x: 5, y: 600 } })
+
+  // drag A across two columns (several intermediate moves) - one Ctrl+Z must undo all of it
+  await drag(page, page.locator('.card:not(.overlay)', { hasText: 'A' }), column(page, 'Done').locator('.cards'))
+  expect(await titles(page, 'Done')).toEqual(['A'])
+  await page.keyboard.press('Control+z')
+  expect(await titles(page, 'Backlog')).toEqual(['A', 'B'])
+  expect(await titles(page, 'Done')).toEqual([])
+
+  // cancel with Escape mid-drag
+  const a = (await page.locator('.card:not(.overlay)', { hasText: 'A' }).boundingBox())!
+  const t = (await column(page, 'Done').locator('.cards').boundingBox())!
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2 + 10, { steps: 3 })
+  await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2, { steps: 15 })
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+  expect(await titles(page, 'Backlog')).toEqual(['A', 'B'])
+})
+
+test('keyboard: focus a card, reorder it, change priority and archive it', async ({ page }) => {
+  await addCard(page, 'Backlog', 'First')
+  await addCard(page, 'Backlog', 'Second')
+  const first = page.locator('.card', { hasText: 'First' })
+  await first.focus()
+  await page.keyboard.press('Shift+ArrowDown')
+  expect(await titles(page, 'Backlog')).toEqual(['Second', 'First'])
+  await expect(first).toBeFocused()
+  await page.keyboard.press('1')
+  await expect(first.locator('.badge')).toHaveText('high')
+  await page.keyboard.press('a')
+  await expect(first).toHaveCount(0)
+  await page.getByRole('button', { name: /^archive/i }).first().click()
+  await expect(page.getByRole('dialog', { name: 'Archive' })).toContainText('First')
+})

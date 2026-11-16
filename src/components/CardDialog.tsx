@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { uid, type Card, type ChecklistItem, type Column, type Dispatch, type Priority } from '../store'
 import { cleanTag, tagHue } from '../tags'
-import { PlusIcon, TrashIcon, XIcon } from './Icons'
+import { ArchiveIcon, PlusIcon, TrashIcon, XIcon } from './Icons'
 
 interface Props {
   card: Card
@@ -59,6 +59,11 @@ export function CardDialog({ card, columns, allTags, dispatch, onClose }: Props)
       },
     })
     if (columnId !== card.columnId) dispatch({ type: 'moveCard', id: card.id, columnId })
+    ref.current?.close()
+  }
+
+  const archive = () => {
+    dispatch({ type: 'archiveCard', id: card.id })
     ref.current?.close()
   }
 
@@ -194,6 +199,7 @@ export function CardDialog({ card, columns, allTags, dispatch, onClose }: Props)
 
       <div className="dialog-foot">
         <button className="ghost danger" onClick={remove}><TrashIcon />Delete</button>
+        <button className="ghost" onClick={archive}><ArchiveIcon />Archive</button>
         <span className="spacer" />
         <button className="ghost" onClick={() => ref.current?.close()}>Cancel</button>
         <button className="primary" onClick={save} disabled={!title.trim()}>Save</button>

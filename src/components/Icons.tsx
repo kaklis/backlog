@@ -40,6 +40,15 @@ export const ChecklistIcon = (p: SVGProps<SVGSVGElement>) => (
 export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p, 15)}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
 )
+export const ArchiveIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p, 15)}><rect x="2" y="4" width="20" height="5" rx="1" /><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M10 13h4" /></svg>
+)
+export const RestoreIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p, 15)}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+)
+export const KeyboardIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M7 15h10" /></svg>
+)
 export const SaveIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p, 15)}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
 )

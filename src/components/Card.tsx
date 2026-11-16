@@ -30,6 +30,7 @@ export function CardView({ card, dispatch, onOpen, overlay }: Props) {
   return (
     <div
       ref={setNodeRef}
+      data-card-id={card.id}
       className={`card${isDragging ? ' dragging' : ''}${overlay ? ' overlay' : ''}`}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}

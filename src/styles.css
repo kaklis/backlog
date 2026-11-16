@@ -46,7 +46,7 @@ input, textarea, button, select { font: inherit; color: inherit; }
   box-shadow: var(--shadow-sm);
 }
 h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -.015em; }
-.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; }
 
 .search-wrap { position: relative; display: flex; align-items: center; }
 .search-wrap svg { position: absolute; left: 10px; color: var(--faint); pointer-events: none; }
@@ -273,4 +273,38 @@ button.danger:hover { color: var(--high); background: color-mix(in oklab, var(--
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .card.overlay { rotate: 0deg; }
+}
+
+/* ---------- archive + shortcuts dialogs ---------- */
+.dialog-heading { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+.small { font-size: 12px; }
+.empty { color: var(--muted); margin: 8px 0 16px; text-align: center; }
+.archive-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.archive-list li { display: flex; align-items: center; gap: 8px; padding: 8px 6px 8px 10px; border-radius: 8px; }
+.archive-list li:hover { background: color-mix(in oklab, var(--text) 4%, transparent); }
+.archive-text { flex: 1; min-width: 0; }
+.archive-text .card-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.icon.danger:hover { color: var(--high); }
+.ghost .count { margin-left: 2px; }
+.shortcut-group { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.shortcuts { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.shortcuts > div { display: flex; align-items: baseline; gap: 12px; }
+.shortcuts dt { flex: 0 0 190px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.shortcuts dd { margin: 0; color: var(--muted); font-size: 13px; }
+.shortcuts em { font-style: normal; color: var(--faint); margin: 0 4px; font-size: 12px; }
+kbd {
+  display: inline-block; min-width: 22px; padding: 1px 6px; text-align: center; font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--bg); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px;
+}
+.column header .icon:disabled { opacity: .3 !important; cursor: default; }
+@media (max-width: 520px) { .shortcuts dt { flex-basis: 120px; } }
+
+/* narrower screens: icon-only Export/Import keeps the toolbar on one row */
+@media (max-width: 1320px) { .controls .label { display: none; } .controls .ghost:has(.label) { padding: 0 8px; } }
+/* phone: the backup panel spans the screen under the top bar instead of hanging off the button */
+@media (max-width: 640px) {
+  .topbar { position: relative; }
+  .controls { justify-content: flex-start; margin-left: 0; width: 100%; }
+  .menu { position: static; }
+  .menu-panel { left: 0; right: 0; width: auto; }
 }
