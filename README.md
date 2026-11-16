@@ -75,6 +75,29 @@ The e2e tests use the Edge/Chrome already installed on your machine. To use Play
 **Accessibility**
 - Everything is reachable by keyboard. To move a card without shortcuts: focus it, press `Space`, use the arrows (to the next column too), then `Space` to drop or `Escape` to cancel; screen readers announce each step with card titles and column names. The e2e suite runs axe (WCAG 2.1 AA) on the board and the dialog in light and dark mode.
 
+## Using it on your phone
+
+The app is a static site, so any phone browser can use it. Data is stored per browser, so the phone and your PC have separate boards (see "Moving data" below).
+
+**Option 1: try it on your home network**
+1. On the PC run `npm run build && npm run preview -- --host --port 4173`.
+2. Find the PC's IP address with `ipconfig` (for example `192.168.1.20`).
+3. On the phone, on the same Wi-Fi, open `http://192.168.1.20:4173`.
+4. If it doesn't load, allow Node through Windows Firewall for private networks.
+
+This works as a normal web page. Browsers only allow service workers and installing on HTTPS (or localhost), so it won't install or work offline this way.
+
+**Option 2: host it (best for daily use)**
+1. Run `npm run build`.
+2. Upload the `dist/` folder to any free static host with HTTPS (Netlify, Cloudflare Pages, Vercel, GitHub Pages...). The build uses relative paths, so a subfolder URL works.
+3. Open the URL on your phone and install it: Chrome on Android, menu → *Install app*; Safari on iPhone, Share → *Add to Home Screen*.
+4. It then opens full-screen and works offline. The host only serves the app code; your cards stay in your phone's browser.
+
+**Moving data between devices**
+- Use **Data → Export JSON** on one device and **Import** on the other. JSON replaces the board you import into; a CSV import adds cards instead.
+- File backup only works in desktop Chromium browsers, not on phones, and clearing site data erases the phone's board, so export now and then.
+- There is no automatic sync; that would need a backend or a cloud file.
+
 ## Keyboard shortcuts
 
 Press `?` in the app for this list.
