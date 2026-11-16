@@ -1,8 +1,8 @@
-import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Card as CardT, Dispatch, Priority } from '../store'
-import { CalendarIcon, XIcon } from './Icons'
+import type { Card as CardT, Dispatch } from '../store'
+import { tagHue } from '../tags'
+import { CalendarIcon, ChecklistIcon, XIcon } from './Icons'
 
 const today = () => new Date().toLocaleDateString('sv') // YYYY-MM-DD in local time
 
@@ -11,61 +11,21 @@ function formatDue(due: string) {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export function CardView({ card, dispatch, overlay }: { card: CardT; dispatch?: Dispatch; overlay?: boolean }) {
-  const [editing, setEditing] = useState(false)
-  const [title, setTitle] = useState(card.title)
-  const [notes, setNotes] = useState(card.notes ?? '')
-  const [priority, setPriority] = useState<Priority | ''>(card.priority ?? '')
-  const [due, setDue] = useState(card.due ?? '')
+interface Props {
+  card: CardT
+  dispatch?: Dispatch
+  onOpen?: (id: string) => void
+  overlay?: boolean
+}
+
+export function CardView({ card, dispatch, onOpen, overlay }: Props) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: card.id,
-    disabled: overlay || editing,
+    disabled: overlay,
   })
-
-  const save = () => {
-    const t = title.trim()
-    if (t && dispatch) {
-      dispatch({
-        type: 'updateCard',
-        id: card.id,
-        title: t,
-        notes: notes.trim() || undefined,
-        priority: priority || undefined,
-        due: due || undefined,
-      })
-    } else setTitle(card.title)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <div className="card editing">
-        <input
-          autoFocus
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') save()
-            if (e.key === 'Escape') setEditing(false)
-          }}
-        />
-        <textarea placeholder="Notes" value={notes} rows={3} onChange={(e) => setNotes(e.target.value)} />
-        <div className="row">
-          <select className="field" value={priority} aria-label="Priority" onChange={(e) => setPriority(e.target.value as Priority | '')}>
-            <option value="">No priority</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-          <input className="field" type="date" value={due} aria-label="Due date" onChange={(e) => setDue(e.target.value)} />
-        </div>
-        <div className="row">
-          <button className="ghost" onClick={() => setEditing(false)}>Cancel</button>
-          <button className="primary" onClick={save}>Save</button>
-        </div>
-      </div>
-    )
-  }
+  const checklist = card.checklist ?? []
+  const doneCount = checklist.filter((i) => i.done).length
+  const hasMeta = card.priority || card.due || checklist.length > 0
 
   return (
     <div
@@ -74,17 +34,34 @@ export function CardView({ card, dispatch, overlay }: { card: CardT; dispatch?: 
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}
       {...listeners}
-      onClick={() => !overlay && setEditing(true)}
+      onClick={() => onOpen?.(card.id)}
+      onKeyDown={(e) => {
+        listeners?.onKeyDown?.(e)
+        if (e.key === 'Enter' && e.target === e.currentTarget) onOpen?.(card.id)
+      }}
     >
+      {card.tags && card.tags.length > 0 && (
+        <div className="card-tags">
+          {card.tags.map((t) => (
+            <span key={t} className="tag" style={{ '--h': tagHue(t) } as React.CSSProperties}>{t}</span>
+          ))}
+        </div>
+      )}
       <div className="card-title">{card.title}</div>
       {card.notes && <div className="card-notes">{card.notes}</div>}
-      {(card.priority || card.due) && (
+      {hasMeta && (
         <div className="card-meta">
           {card.priority && <span className={`badge ${card.priority}`}>{card.priority}</span>}
           {card.due && (
             <span className={`due${card.due < today() ? ' overdue' : ''}`}>
               <CalendarIcon />
               {formatDue(card.due)}
+            </span>
+          )}
+          {checklist.length > 0 && (
+            <span className={`progress${doneCount === checklist.length ? ' complete' : ''}`}>
+              <ChecklistIcon />
+              {doneCount}/{checklist.length}
             </span>
           )}
         </div>

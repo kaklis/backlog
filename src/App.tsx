@@ -13,6 +13,7 @@ import { parseBoard, useBoard, type Card, type Dispatch, type Priority } from '.
 import { ColumnView } from './components/Column'
 import { BoardIcon, DownloadIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, UploadIcon } from './components/Icons'
 import { CardView } from './components/Card'
+import { CardDialog } from './components/CardDialog'
 
 type Filter = Priority | 'none' | 'all'
 type Sort = 'manual' | 'priority' | 'due'
@@ -115,6 +116,15 @@ export default function App() {
   const [filter, setFilter] = usePersisted<Filter>('backlog.filter', 'all', FILTERS)
   const [sort, setSort] = usePersisted<Sort>('backlog.sort', 'manual', SORTS)
   const [query, setQuery] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
+  const [openId, setOpenId] = useState<string | null>(null)
+  const lastDragEnd = useRef(0)
+  const allTags = [...new Set(state.cards.flatMap((c) => c.tags ?? []))].sort((a, b) => a.localeCompare(b))
+  const openCard = state.cards.find((c) => c.id === openId)
+  // a drag that ends over its own card would otherwise also register as a click
+  const open = (id: string) => {
+    if (Date.now() - lastDragEnd.current > 250) setOpenId(id)
+  }
   const searchRef = useRef<HTMLInputElement>(null)
   const importRef = useRef<HTMLInputElement>(null)
 
@@ -146,6 +156,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement
       const typing = el.matches('input, textarea, select') || el.isContentEditable
+      if (document.querySelector('dialog[open]')) return
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !typing) {
         e.preventDefault()
         undoRef.current()
@@ -165,7 +176,8 @@ export default function App() {
     const q = query.trim().toLowerCase()
     const cards = state.cards
       .filter((c) => c.columnId === columnId)
-      .filter((c) => !q || c.title.toLowerCase().includes(q))
+      .filter((c) => !q || c.title.toLowerCase().includes(q) || c.tags?.some((t) => t.toLowerCase().includes(q)))
+      .filter((c) => !tagFilter || c.tags?.includes(tagFilter))
       .filter((c) => filter === 'all' || (filter === 'none' ? !c.priority : c.priority === filter))
     if (sort === 'priority') cards.sort(byPriority)
     if (sort === 'due') cards.sort(byDue)
@@ -192,6 +204,7 @@ export default function App() {
 
   const onEnd = ({ active, over }: DragEndEvent) => {
     setActiveId(null)
+    lastDragEnd.current = Date.now()
     if (over && active.id !== over.id) move(String(active.id), String(over.id))
   }
 
@@ -210,7 +223,7 @@ export default function App() {
               className="search"
               type="search"
               placeholder="Search cards  ( / )"
-              aria-label="Search cards by title"
+              aria-label="Search cards by title or tag"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
@@ -224,6 +237,13 @@ export default function App() {
             <option value="low">Low priority</option>
             <option value="none">No priority</option>
           </select>
+          {allTags.length > 0 && (
+            <select className="field" aria-label="Filter by tag" value={allTags.includes(tagFilter) ? tagFilter : ''}
+              onChange={(e) => setTagFilter(e.target.value)}>
+              <option value="">All tags</option>
+              {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
           <select className="field" aria-label="Sort cards" value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}>
             <option value="manual">Sort: Manual</option>
@@ -264,6 +284,7 @@ export default function App() {
               key={col.id}
               column={col}
               dispatch={dispatch}
+              onOpen={open}
               cards={visibleCards(col.id)}
             />
           ))}
@@ -273,6 +294,16 @@ export default function App() {
         </main>
         <DragOverlay>{active && <CardView card={active} overlay />}</DragOverlay>
       </DndContext>
+      {openCard && (
+        <CardDialog
+          key={openCard.id}
+          card={openCard}
+          columns={state.columns}
+          allTags={allTags}
+          dispatch={dispatch}
+          onClose={() => setOpenId(null)}
+        />
+      )}
       {toast && trash.length > 0 && (
         <div className="toast" role="status">
           Card deleted

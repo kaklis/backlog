@@ -34,6 +34,12 @@ export const MoonIcon = (p: SVGProps<SVGSVGElement>) => (
 export const CalendarIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p, 12)}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
 )
+export const ChecklistIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p, 12)}><path d="m4 12 5 5L20 6" /></svg>
+)
+export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p, 15)}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
+)
 export const DownloadIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p, 15)}><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
 )

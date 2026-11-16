@@ -5,7 +5,7 @@ import type { Card, Column as ColumnT, Dispatch } from '../store'
 import { CardView } from './Card'
 import { XIcon } from './Icons'
 
-export function ColumnView({ column, cards, dispatch }: { column: ColumnT; cards: Card[]; dispatch: Dispatch }) {
+export function ColumnView({ column, cards, dispatch, onOpen }: { column: ColumnT; cards: Card[]; dispatch: Dispatch; onOpen: (id: string) => void }) {
   const [draft, setDraft] = useState('')
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
@@ -38,7 +38,7 @@ export function ColumnView({ column, cards, dispatch }: { column: ColumnT; cards
       <div ref={setNodeRef} className="cards">
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((c) => (
-            <CardView key={c.id} card={c} dispatch={dispatch} />
+            <CardView key={c.id} card={c} dispatch={dispatch} onOpen={onOpen} />
           ))}
         </SortableContext>
       </div>

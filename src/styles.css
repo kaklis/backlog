@@ -146,19 +146,78 @@ button.icon.square { width: 32px; height: 32px; color: var(--muted); }
 .due { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 .due.overdue { color: var(--high); font-weight: 500; }
 
-/* inline editor */
-.card.editing { cursor: default; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
-.editing input, .editing textarea, .editing select {
-  width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px;
-}
-.editing input:focus-visible, .editing textarea:focus-visible, .editing select:focus-visible {
-  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring);
-}
-.editing input[type="text"], .editing > input:first-child { font-weight: 500; }
-.editing select, .editing input[type="date"] { flex: 1; min-width: 0; height: 32px; padding-top: 0; padding-bottom: 0; }
 textarea { resize: vertical; min-height: 64px; }
-.row { display: flex; gap: 6px; }
-.row .primary { margin-left: auto; }
+
+/* tags + checklist progress on cards */
+.card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.tag {
+  display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px; border-radius: 5px;
+  font-size: 11px; font-weight: 500; line-height: 1;
+  color: light-dark(hsl(var(--h) 55% 33%), hsl(var(--h) 75% 74%));
+  background: light-dark(hsl(var(--h) 80% 50% / .13), hsl(var(--h) 80% 60% / .16));
+}
+.progress { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.progress.complete { color: var(--low); }
+
+/* card detail dialog */
+.dialog {
+  width: min(560px, calc(100vw - 24px)); max-height: min(86dvh, 760px); padding: 0; border: 1px solid var(--border);
+  border-radius: 16px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
+  flex-direction: column; overflow: hidden;
+}
+.dialog[open] { display: flex; animation: dialog-in .2s var(--ease); }
+.dialog::backdrop { background: rgb(0 0 0 / .4); backdrop-filter: blur(2px); animation: fade-in .2s; }
+@keyframes dialog-in { from { opacity: 0; translate: 0 8px; scale: .98; } }
+@keyframes fade-in { from { opacity: 0; } }
+.dialog-head { display: flex; align-items: center; gap: 8px; padding: 14px 14px 6px 20px; }
+.dialog-title {
+  flex: 1; min-width: 0; border: 0; background: none; font-size: 18px; font-weight: 600; letter-spacing: -.01em;
+  padding: 4px 6px; margin-left: -6px; border-radius: 8px;
+}
+.dialog-title:hover { background: color-mix(in oklab, var(--text) 5%, transparent); }
+.dialog-title:focus-visible { outline: none; background: var(--bg); box-shadow: 0 0 0 2px var(--ring); }
+.dialog-body { padding: 8px 20px 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+.dialog-foot { display: flex; align-items: center; gap: 6px; padding: 12px 14px; border-top: 1px solid var(--border); background: var(--col); }
+.spacer { flex: 1; }
+.dialog-foot button:disabled { opacity: .5; cursor: not-allowed; }
+button.danger:hover { color: var(--high); background: color-mix(in oklab, var(--high) 10%, transparent); }
+.field-label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.field-label > :not(.checklist-head):not(span) { font-weight: 400; color: var(--text); }
+.dialog textarea, .dialog .field {
+  width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+  box-shadow: none;
+}
+.dialog .field { height: 34px; padding-top: 0; padding-bottom: 0; }
+.dialog textarea:focus-visible, .dialog .field:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 520px) { .grid3 { grid-template-columns: 1fr 1fr; } .grid3 > :first-child { grid-column: 1 / -1; } }
+
+.tag-input {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 34px; padding: 4px 8px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+}
+.tag-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.tag-input input { flex: 1; min-width: 120px; border: 0; background: none; outline: none; padding: 3px 0; }
+.tag.removable { height: 22px; padding-right: 3px; font-size: 12px; }
+.tag.removable button { width: 16px; height: 16px; padding: 0; border-radius: 4px; color: inherit; opacity: .7; }
+.tag.removable button:hover { opacity: 1; background: color-mix(in oklab, currentColor 15%, transparent); }
+
+.checklist-head { display: flex; justify-content: space-between; }
+.muted { color: var(--muted); }
+.bar { height: 4px; border-radius: 999px; background: color-mix(in oklab, var(--text) 9%, transparent); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .25s var(--ease); }
+.checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.checklist li { display: flex; align-items: center; gap: 8px; padding: 2px 0; border-radius: 6px; }
+.checklist li:hover { background: color-mix(in oklab, var(--text) 4%, transparent); }
+.checklist input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); flex: none; margin: 0; cursor: pointer; }
+.item-text { flex: 1; min-width: 0; border: 0; background: none; padding: 5px 4px; border-radius: 6px; }
+.item-text:focus-visible { outline: none; background: var(--bg); box-shadow: 0 0 0 2px var(--ring); }
+.checklist li.done .item-text { color: var(--faint); text-decoration: line-through; }
+.checklist .icon { opacity: 0; }
+.checklist li:hover .icon, .checklist .icon:focus-visible { opacity: 1; }
+.add-item { display: flex; align-items: center; gap: 8px; color: var(--faint); padding: 2px 0; }
+.add-item input { flex: 1; border: 0; background: none; outline: none; padding: 5px 4px; color: var(--text); }
+.add-item input::placeholder { color: var(--muted); }
 
 .add {
   width: 100%; height: 34px; background: transparent; border: 1px solid transparent; border-radius: 8px;

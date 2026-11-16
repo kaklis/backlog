@@ -24,7 +24,9 @@ npm run preview  # serve the production build locally
 
 **Cards**
 - Type in a column's "+ Add card" box and press Enter.
-- Click a card to edit its title, notes, priority (low / medium / high) and due date. Enter or Save confirms, Esc cancels.
+- Click a card (or focus it and press Enter) to open its detail dialog: title, notes, status (column), priority, due date, tags and a checklist. Save applies the changes; Esc, Cancel or clicking outside discards them. Delete is also available there.
+- **Tags:** type a tag and press Enter or comma; Backspace removes the last one. Tags get a color from their name and appear on the card.
+- **Checklists:** add items, tick them off, edit or remove them. Cards show progress such as 2/5.
 - Drag cards within a column or between columns.
 - Hover a card and click × to delete it. A toast offers **Undo**, or press Ctrl/Cmd+Z (last 20 deletes this session).
 
@@ -33,7 +35,8 @@ npm run preview  # serve the production build locally
 - "+ Column" adds a new one.
 
 **Finding things**
-- Search by title with the search box. Esc clears it.
+- Search by title or tag with the search box. Esc clears it.
+- Filter by tag with the tag dropdown (appears once any card has tags).
 - Filter by priority (All, High, Medium, Low, No priority).
 - Sort by Manual (your drag order), Priority, or Due date. Sorting and filtering only change what you see, not the stored order.
 - Overdue due dates are shown in red.
@@ -49,7 +52,7 @@ npm run preview  # serve the production build locally
 | `/` | Focus search (when not typing in a field) |
 | Ctrl/Cmd + K | Focus search |
 | Ctrl/Cmd + Z | Undo last card delete (when not typing in a field) |
-| Esc | Clear search / cancel card edit |
+| Esc | Clear search / close the card dialog without saving |
 
 ## Data and storage
 
@@ -63,6 +66,8 @@ src/
   App.tsx               top bar, filter/sort/search, drag and drop, undo, import/export
   store.ts              board state, reducer, localStorage persistence, import validation
   components/Column.tsx column with card list and add box
-  components/Card.tsx   sortable card and inline editor
+  components/Card.tsx   sortable card
+  components/CardDialog.tsx  card detail dialog (notes, tags, checklist)
+  tags.ts               tag color + normalization helpers
   styles.css            theme variables (light/dark) and layout
 ```

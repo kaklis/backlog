@@ -6,8 +6,15 @@ export interface Card {
   notes?: string
   priority?: Priority
   due?: string // YYYY-MM-DD
+  tags?: string[]
+  checklist?: ChecklistItem[]
   columnId: string
   createdAt: number
+}
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: boolean
 }
 export type Priority = 'low' | 'medium' | 'high'
 export interface Column {
@@ -21,7 +28,7 @@ export interface BoardState {
 
 type Action =
   | { type: 'addCard'; columnId: string; title: string }
-  | { type: 'updateCard'; id: string; title: string; notes?: string; priority?: Priority; due?: string }
+  | { type: 'updateCard'; id: string; patch: Partial<Omit<Card, 'id' | 'columnId' | 'createdAt'>> }
   | { type: 'deleteCard'; id: string }
   | { type: 'moveCard'; id: string; columnId: string; overId?: string }
   | { type: 'addColumn'; name: string }
@@ -31,7 +38,7 @@ type Action =
   | { type: 'restoreCard'; card: Card; index: number }
 
 const KEY = 'backlog.v1'
-const uid = () => Math.random().toString(36).slice(2, 10)
+export const uid = () => Math.random().toString(36).slice(2, 10)
 
 const initial: BoardState = {
   columns: [
@@ -54,6 +61,23 @@ function load(): BoardState {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
 const PRIORITIES = ['low', 'medium', 'high']
+
+function parseTags(v: unknown): string[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const tags = [...new Set(v.filter((t): t is string => typeof t === 'string').map((t) => t.trim()).filter(Boolean))]
+  return tags.length ? tags : undefined
+}
+
+function parseChecklist(v: unknown): ChecklistItem[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const items = v
+    .filter((i) => isObj(i) && typeof i.text === 'string' && i.text.trim())
+    .map((i) => {
+      const o = i as Record<string, unknown>
+      return { id: typeof o.id === 'string' ? o.id : uid(), text: (o.text as string).trim(), done: o.done === true }
+    })
+  return items.length ? items : undefined
+}
 
 /** Returns a cleaned BoardState from imported JSON, or throws an Error describing what is wrong. */
 export function parseBoard(data: unknown): BoardState {
@@ -78,6 +102,8 @@ export function parseBoard(data: unknown): BoardState {
       createdAt: typeof c.createdAt === 'number' ? c.createdAt : Date.now(),
       notes: typeof c.notes === 'string' ? c.notes : undefined,
       priority: PRIORITIES.includes(c.priority as string) ? (c.priority as Priority) : undefined,
+      tags: parseTags(c.tags),
+      checklist: parseChecklist(c.checklist),
       due: typeof c.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.due) ? c.due : undefined,
     }
   })
@@ -102,7 +128,7 @@ function reducer(s: BoardState, a: Action): BoardState {
     case 'updateCard':
       return {
         ...s,
-        cards: s.cards.map((c) => (c.id === a.id ? { ...c, title: a.title, notes: a.notes, priority: a.priority, due: a.due } : c)),
+        cards: s.cards.map((c) => (c.id === a.id ? { ...c, ...a.patch } : c)),
       }
     case 'deleteCard':
       return { ...s, cards: s.cards.filter((c) => c.id !== a.id) }
