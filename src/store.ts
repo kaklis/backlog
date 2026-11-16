@@ -110,7 +110,7 @@ export function parseBoard(data: unknown): BoardState {
   return { columns, cards }
 }
 
-function reducer(s: BoardState, a: Action): BoardState {
+export function reducer(s: BoardState, a: Action): BoardState {
   switch (a.type) {
     case 'replace':
       return a.state

@@ -23,7 +23,7 @@ export function ColumnView({ column, cards, dispatch, onOpen }: { column: Column
   }
 
   return (
-    <section className={`column${isOver ? ' over' : ''}`}>
+    <section className={`column${isOver ? ' over' : ''}`} aria-label={column.name}>
       <header>
         <input
           className="col-name"

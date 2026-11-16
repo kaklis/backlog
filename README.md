@@ -20,6 +20,15 @@ npm run build    # type-check and build to dist/
 npm run preview  # serve the production build locally
 ```
 
+## Testing
+
+```bash
+npm test             # unit + component tests (Vitest, Testing Library, jsdom) - fast, no browser
+npm run test:e2e     # end-to-end tests (Playwright) - builds the app, serves it on :4173, drives a real browser
+```
+
+The e2e tests use the Edge/Chrome already installed on your machine. To use Playwright's own browser instead, run `npx playwright install chromium` and set `PW_CHANNEL=` (empty) before `npm run test:e2e`. File backup tests replace the OS file picker with an in-browser stand-in.
+
 ## Usage
 
 **Cards**
@@ -72,5 +81,8 @@ src/
   backup.ts             file backup (File System Access API + IndexedDB handle)
   components/BackupMenu.tsx  backup status and controls
   tags.ts               tag color + normalization helpers
+  test/setup.ts         Vitest setup (jsdom polyfills)
+  *.test.ts(x)          unit and component tests
   styles.css            theme variables (light/dark) and layout
+e2e/                    Playwright end-to-end tests
 ```
