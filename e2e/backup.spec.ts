@@ -24,7 +24,7 @@ const backupFile = (page: Page) =>
     const root = await navigator.storage.getDirectory()
     return (await (await root.getFileHandle('backlog-backup.json', { create: true })).getFile()).text()
   })
-const dot = (page: Page) => page.locator('.menu .dot')
+const dot = (page: Page) => page.getByTitle('File backup').locator('.dot')
 
 async function addCard(page: Page, title: string) {
   const input = page.getByPlaceholder('+ Add card').first()
@@ -33,7 +33,7 @@ async function addCard(page: Page, title: string) {
 }
 
 async function connect(page: Page) {
-  await page.locator('.menu summary').click()
+  await page.getByTitle('File backup').click()
   await page.getByRole('button', { name: /choose backup file/i }).click()
   await expect(dot(page)).toHaveClass(/\bon\b/)
 }
@@ -91,7 +91,7 @@ test('never overwrites a file that is not a backup', async ({ page }) => {
 
 test('stop backing up forgets the file', async ({ page }) => {
   await connect(page)
-  await page.locator('.menu summary').click()
+  await page.getByTitle('File backup').click()
   await page.getByRole('button', { name: /stop backing up/i }).click()
   await expect(dot(page)).toHaveClass(/\boff\b/)
   await page.reload()

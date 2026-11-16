@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
+import { useDismiss } from '../hooks'
 import type { useFileBackup } from '../backup'
 import { SaveIcon } from './Icons'
 
@@ -8,14 +9,7 @@ export function BackupMenu({ backup }: { backup: Backup }) {
   const ref = useRef<HTMLDetailsElement>(null)
   const { status, fileName, savedAt, message } = backup
 
-  // close when clicking elsewhere
-  useEffect(() => {
-    const onDown = (e: PointerEvent) => {
-      if (ref.current?.open && !ref.current.contains(e.target as Node)) ref.current.open = false
-    }
-    document.addEventListener('pointerdown', onDown)
-    return () => document.removeEventListener('pointerdown', onDown)
-  }, [])
+  useDismiss(ref)
 
   const close = () => ref.current && (ref.current.open = false)
   const time = savedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

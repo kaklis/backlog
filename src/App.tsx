@@ -2,19 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   closestCorners,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type Announcements,
   type DragOverEvent,
 } from '@dnd-kit/core'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { parseBoard, useBoard, type Action, type Card, type Dispatch, type Priority } from './store'
-import { usePersisted, useTheme } from './hooks'
+import { usePersisted, useTheme, useViews, type SavedView } from './hooks'
 import { matchesDue, type DueFilter } from './dates'
 import { ColumnView } from './components/Column'
 import {
-  ArchiveIcon, BoardIcon, DownloadIcon, KeyboardIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, UploadIcon,
+  ArchiveIcon, KeyboardIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon,
 } from './components/Icons'
 import { CardView } from './components/Card'
 import { CardDialog } from './components/CardDialog'
@@ -22,6 +25,11 @@ import { ArchivePanel } from './components/ArchivePanel'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { BackupMenu } from './components/BackupMenu'
 import { backupSupported, useFileBackup } from './backup'
+import { useBoards, storageKeyFor, type Boards } from './boards'
+import { boardToCsv, importCsv } from './csv'
+import { BoardSwitcher } from './components/BoardSwitcher'
+import { DataMenu } from './components/DataMenu'
+import { ViewsMenu } from './components/ViewsMenu'
 
 type Filter = Priority | 'none' | 'all'
 type Sort = 'manual' | 'priority' | 'due'
@@ -49,9 +57,17 @@ function toastMessage(a: Action): string | null {
 }
 
 export default function App() {
-  const { state, dispatch: rawDispatch, undo, redo, beginDrag, endDrag } = useBoard()
+  const boards = useBoards()
+  // keyed by board id: switching boards remounts the view, so history, search and backup all start fresh per board
+  return <BoardView key={boards.active.id} boards={boards} />
+}
+
+function BoardView({ boards }: { boards: Boards }) {
+  const boardId = boards.active.id
+  const { state, dispatch: rawDispatch, undo, redo, beginDrag, endDrag } = useBoard(storageKeyFor(boardId))
   const [theme, toggleTheme] = useTheme()
-  const backup = useFileBackup(state, rawDispatch)
+  const backup = useFileBackup(state, rawDispatch, boardId)
+  const views = useViews()
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null)
   const toastTimer = useRef<number>()
 
@@ -105,18 +121,30 @@ export default function App() {
     return cards
   }
 
-  const exportBoard = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' })
+  const download = (text: string, type: string, ext: string) => {
+    const blob = new Blob([text], { type })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `backlog-${new Date().toLocaleDateString('sv')}.json`
+    a.download = `backlog-${new Date().toLocaleDateString('sv')}.${ext}`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 1000) // revoking right away can cancel the download
   }
+  const exportBoard = () => download(JSON.stringify(state, null, 2), 'application/json', 'json')
+  const exportCsv = () => download(boardToCsv(state), 'text/csv', 'csv')
 
   const importBoard = async (file: File) => {
     try {
-      const next = parseBoard(JSON.parse(await file.text()))
+      const text = await file.text()
+      if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {
+        const r = importCsv(text, state)
+        const skipped = r.skipped ? ` (${r.skipped} rows without a title are skipped)` : ''
+        const cols = r.columns.length ? ` and ${r.columns.length} new column${r.columns.length === 1 ? '' : 's'}` : ''
+        if (confirm(`Add ${r.cards.length} cards${cols} to this board?${skipped}`)) {
+          dispatch({ type: 'importCards', columns: r.columns, cards: r.cards })
+        }
+        return
+      }
+      const next = parseBoard(JSON.parse(text))
       if (confirm(`Replace the current board with ${next.cards.length} cards in ${next.columns.length} columns?`)) {
         dispatch({ type: 'replace', state: next })
       }
@@ -125,10 +153,21 @@ export default function App() {
     }
   }
 
+  const currentView = { query, priority: filter, tag: tagFilter, due: dueFilter, sort }
+  const isDefaultView = !query.trim() && filter === 'all' && !tagFilter && dueFilter === 'any' && sort === 'manual'
+  const applyView = (v: SavedView) => {
+    setQuery(v.query)
+    setFilter((FILTERS as string[]).includes(v.priority) ? (v.priority as Filter) : 'all')
+    setTagFilter(v.tag)
+    setDueFilter((DUE_FILTERS as string[]).includes(v.due) ? (v.due as DueFilter) : 'any')
+    setSort((SORTS as string[]).includes(v.sort) ? (v.sort as Sort) : 'manual')
+  }
+  const resetView = () => applyView({ id: '', name: '', query: '', priority: 'all', tag: '', due: 'any', sort: 'manual' })
+
   // ---- keyboard ----
   // The handler is registered once; it reads the latest render's values through this ref.
-  const ctx = useRef({ state, visibleCards, sort, dispatch, undo, redo, open })
-  ctx.current = { state, visibleCards, sort, dispatch, undo, redo, open }
+  const ctx = useRef({ state, visibleCards, sort, dispatch, undo, redo, open, dragging: false })
+  ctx.current = { state, visibleCards, sort, dispatch, undo, redo, open, dragging: activeId !== null }
 
   useEffect(() => {
     const focusCard = (id: string) => document.querySelector<HTMLElement>(`[data-card-id="${id}"]`)?.focus()
@@ -137,6 +176,7 @@ export default function App() {
 
     const onKey = (e: KeyboardEvent) => {
       const c = ctx.current
+      if (c.dragging) return // dnd-kit owns the keyboard (arrows, Space, Escape) during a drag
       const el = e.target as HTMLElement
       const typing = el.matches('input, textarea, select') || el.isContentEditable
       const mod = e.ctrlKey || e.metaKey
@@ -254,7 +294,12 @@ export default function App() {
   }, [state])
 
   // ---- drag and drop ----
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Space lifts a focused card, arrows move it (also between columns), Space drops, Escape cancels.
+    // Enter stays "open the card", so it is not a start key.
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] } }),
+  )
   const active = state.cards.find((c) => c.id === activeId)
 
   const columnOf = (id: string) =>
@@ -266,6 +311,27 @@ export default function App() {
     if (!columnId) return
     const over = state.cards.some((c) => c.id === overId) ? overId : undefined
     rawDispatch({ type: 'moveCard', id: activeId, columnId, overId: over, transient: true })
+  }
+
+  // spoken by screen readers during a drag: card titles and column names instead of internal ids
+  const describe = (id: string | number) => {
+    const card = state.cards.find((c) => c.id === id)
+    if (card) return `"${card.title}"`
+    return state.columns.find((c) => c.id === id)?.name ?? ''
+  }
+  const where = (id: string | number) => {
+    const card = state.cards.find((c) => c.id === id)
+    const col = card ? state.columns.find((c) => c.id === card.columnId) : state.columns.find((c) => c.id === id)
+    if (!col) return ''
+    const list = live.filter((c) => c.columnId === col.id)
+    const pos = card ? list.findIndex((c) => c.id === card.id) + 1 : 0
+    return card && pos ? `position ${pos} of ${list.length} in ${col.name}` : `column ${col.name}`
+  }
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Picked up ${describe(active.id)}, ${where(active.id)}.`,
+    onDragOver: ({ active, over }) => (over ? `${describe(active.id)} is over ${where(over.id)}.` : `${describe(active.id)} is no longer over a column.`),
+    onDragEnd: ({ active, over }) => (over ? `Dropped ${describe(active.id)}, ${where(active.id)}.` : `${describe(active.id)} was dropped.`),
+    onDragCancel: ({ active }) => `Move cancelled. ${describe(active.id)} is back where it was.`,
   }
 
   const onOver = ({ active, over }: DragOverEvent) => {
@@ -285,8 +351,7 @@ export default function App() {
     <div className="app">
       <div className="topbar">
         <div className="brand">
-          <span className="brand-mark"><BoardIcon /></span>
-          <h1>Backlog</h1>
+          <BoardSwitcher boards={boards} />
         </div>
         <div className="controls">
           <div className="search-wrap">
@@ -336,16 +401,20 @@ export default function App() {
             <ArchiveIcon />Archive{archived.length > 0 && <span className="count">{archived.length}</span>}
           </button>
           {backupSupported && <BackupMenu backup={backup} />}
-          <button className="ghost" onClick={exportBoard} aria-label="Export" title="Export board as JSON">
-            <DownloadIcon /><span className="label">Export</span>
-          </button>
-          <button className="ghost" onClick={() => importRef.current?.click()} aria-label="Import" title="Import board from JSON">
-            <UploadIcon /><span className="label">Import</span>
-          </button>
+          <ViewsMenu
+            views={views.views}
+            current={currentView}
+            isDefault={isDefaultView}
+            onApply={applyView}
+            onReset={resetView}
+            onSave={(name) => views.save(name, currentView)}
+            onRemove={views.remove}
+          />
+          <DataMenu onExportJson={exportBoard} onExportCsv={exportCsv} onImport={() => importRef.current?.click()} />
           <input
             ref={importRef}
             type="file"
-            accept="application/json,.json"
+            accept="application/json,.json,text/csv,.csv"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0]
@@ -364,6 +433,12 @@ export default function App() {
       </div>
       <DndContext
         sensors={sensors}
+        accessibility={{
+          announcements,
+          screenReaderInstructions: {
+            draggable: 'Press Space to pick up this card. Use the arrow keys to move it, Space to drop it, Escape to cancel. Press Enter to open it instead.',
+          },
+        }}
         collisionDetection={closestCorners}
         onDragStart={(e) => {
           beginDrag()
@@ -386,6 +461,7 @@ export default function App() {
               cards={visibleCards(col.id)}
               totalCount={state.cards.filter((c) => c.columnId === col.id).length}
               activeCount={live.filter((c) => c.columnId === col.id).length}
+              templates={state.templates ?? []}
             />
           ))}
           <button className="add-col" onClick={() => dispatch({ type: 'addColumn', name: 'New column' })}>

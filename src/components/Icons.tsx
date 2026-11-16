@@ -49,6 +49,15 @@ export const RestoreIcon = (p: SVGProps<SVGSVGElement>) => (
 export const KeyboardIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M7 15h10" /></svg>
 )
+export const RepeatIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p, 12)}><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg>
+)
+export const PencilIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p, 11)}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+)
+export const TemplateIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+)
 export const SaveIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p, 15)}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
 )

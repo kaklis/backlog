@@ -57,7 +57,23 @@ The e2e tests use the Edge/Chrome already installed on your machine. To use Play
 **Other**
 - ☾ / ☀ toggles dark mode. Until you choose, it follows your OS setting.
 - **Backup** (Chrome, Edge and other Chromium browsers) keeps a JSON file on your computer in sync automatically. Choose a file once; it is rewritten shortly after every change. After a browser restart it may ask you to click **Reconnect** to re-grant access. If the board is empty but the file has cards (e.g. site data was cleared), it offers to restore instead of overwriting. A file that isn't a Backlog backup is never overwritten. Firefox and Safari don't support this, so use Export there.
-- **Export** downloads the board as `backlog-YYYY-MM-DD.json`. **Import** replaces the current board with an exported file (after confirmation; invalid files are rejected without changes).
+- **Data menu:** **Export JSON** downloads the whole board (`backlog-YYYY-MM-DD.json`); **Export CSV** gives one row per card. **Import** takes either: a JSON export *replaces* the board (after confirmation; invalid files are rejected without changes), a CSV *adds* cards. The CSV importer recognises this app's own headers and common tracker ones: Jira (`Summary`, `Status`, `Priority`, `Labels`, `Description`, `Due Date`), Linear and GitHub / Trello style (`Title`, `State`, `Labels`, `Body`, `List`...). Statuses are matched to your columns by name and unknown ones become new columns; priorities such as Highest, Urgent or P1 map to high, and so on. Imports are undoable.
+
+**Notes, repeats and templates**
+- **Markdown in notes:** `**bold**`, `*italic*`, `` `code` ``, `- ` and `1.` lists, `[links](https://...)` and bare URLs. Use the Write / Preview tabs in the card dialog. Only plain formatting is supported; raw HTML is never rendered.
+- **Repeat:** set Daily / Weekly / Monthly in the card dialog. Archiving a repeating card creates the next one with the following due date (monthly keeps the day of the month, so Jan 31 gives Feb 28 and then Mar 31) and an unticked checklist. One undo removes both.
+- **Templates:** *Make template* in the card dialog saves its notes, priority, tags, checklist and repeat rule. The template icon next to a column's add box starts a new card from one.
+- Due dates read **Today** / **Tomorrow** in amber, and overdue ones in red.
+
+**Boards and views**
+- The board name in the top left opens the **board switcher**: add, rename, delete (with confirmation) and switch between boards, e.g. one per project. Each board has its own cards, undo history and backup file; the first one is your original board.
+- **Views** saves the current search, filters and sort under a name, so "High priority this week" is one click. Saving under an existing name replaces it. Views are shared by all boards.
+
+**Install and offline**
+- In a production build (`npm run build && npm run preview`, or hosted anywhere) the app registers a service worker, so it loads without a network and can be installed from the browser's install button (Chrome/Edge) or "Add to Home Screen". Data was always local, so everything works offline.
+
+**Accessibility**
+- Everything is reachable by keyboard. To move a card without shortcuts: focus it, press `Space`, use the arrows (to the next column too), then `Space` to drop or `Escape` to cancel; screen readers announce each step with card titles and column names. The e2e suite runs axe (WCAG 2.1 AA) on the board and the dialog in light and dark mode.
 
 ## Keyboard shortcuts
 
@@ -86,20 +102,24 @@ With a card focused (Tab to one):
 
 ## Data and storage
 
-Everything is stored in this browser under these `localStorage` keys: `backlog.v1` (board), `backlog.filter`, `backlog.sort`, `backlog.due`, `backlog.theme`. Clearing site data erases the board, so turn on file backup (or use Export). Data is not shared between browsers or devices; use Export / Import to move it.
+Everything is stored in this browser under these `localStorage` keys: `backlog.boards` (list of boards), `backlog.v1` (the first board) and `backlog.board.<id>` (others), `backlog.views`, `backlog.filter`, `backlog.sort`, `backlog.due`, `backlog.theme`. Clearing site data erases the board, so turn on file backup (or use Export). Data is not shared between browsers or devices; use Export / Import to move it. Deleting a board removes its data from this browser.
 
 ## Project layout
 
 ```
 src/
   main.tsx              entry point
-  App.tsx               top bar, filter/sort/search, drag and drop, undo, import/export
+  App.tsx               board shell, top bar, filter/sort/search, drag and drop, undo, import/export
+  boards.ts             list of boards (switcher state)
+  csv.ts                CSV parse/export and Jira/Linear/GitHub import mapping
+  markdown.tsx          small safe Markdown renderer for notes
   store.ts              board state, reducer, localStorage persistence, import validation
   components/Column.tsx column with card list and add box
   components/Card.tsx   sortable card
   components/CardDialog.tsx  card detail dialog (notes, tags, checklist)
   backup.ts             file backup (File System Access API + IndexedDB handle)
   components/BackupMenu.tsx  backup status and controls
+  components/BoardSwitcher.tsx, ViewsMenu.tsx, DataMenu.tsx  top-bar menus
   components/ArchivePanel.tsx  archived cards: restore / delete
   components/ShortcutsHelp.tsx keyboard shortcut list
   dates.ts              due-date helpers (today, week range, due filters)
@@ -108,5 +128,6 @@ src/
   test/setup.ts         Vitest setup (jsdom polyfills)
   *.test.ts(x)          unit and component tests
   styles.css            theme variables (light/dark) and layout
+public/                 manifest, icons and service worker (offline)
 e2e/                    Playwright end-to-end tests
 ```

@@ -298,3 +298,128 @@ describe('WIP limits', () => {
     expect(parsed.columns.map((c) => c.wipLimit)).toEqual([4, undefined, undefined, undefined])
   })
 })
+
+describe('recurring cards', () => {
+  const today = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const inDays = (n: number) => ymd(new Date(today.getFullYear(), today.getMonth(), today.getDate() + n))
+
+  it('archiving a recurring card adds the next occurrence with a later due date and reset checklist', () => {
+    const start = board([
+      card('1', 'b', {
+        recurrence: 'weekly',
+        due: inDays(2),
+        tags: ['ops'],
+        priority: 'high',
+        checklist: [{ id: 'x', text: 'step', done: true }],
+      }),
+    ])
+    const s = reducer(start, { type: 'archiveCard', id: '1' })
+    expect(s.cards).toHaveLength(2)
+    expect(s.cards[0].archivedAt).toBeTypeOf('number')
+    const next = s.cards[1]
+    expect(next.id).not.toBe('1')
+    expect(next).toMatchObject({ title: '1'.toUpperCase(), columnId: 'b', recurrence: 'weekly', priority: 'high', tags: ['ops'] })
+    expect(next.archivedAt).toBeUndefined()
+    expect(next.due).toBe(inDays(9))
+    expect(next.checklist).toEqual([{ id: expect.any(String), text: 'step', done: false }])
+    expect(next.checklist![0].id).not.toBe('x')
+  })
+
+  it('works for bulk archive, and only for cards that were not already archived', () => {
+    const start = board([
+      card('1', 'a', { recurrence: 'daily', due: inDays(0) }),
+      card('2', 'a', { recurrence: 'daily', archivedAt: 5 }),
+      card('3', 'a'),
+    ])
+    const s = reducer(start, { type: 'archiveCards', ids: ['1', '2', '3'] })
+    expect(s.cards).toHaveLength(4) // exactly one occurrence added (for card 1)
+    expect(s.cards[3].due).toBe(inDays(1))
+  })
+
+  it('a recurring card without a due date gets one, counted from today', () => {
+    const s = reducer(board([card('1', 'a', { recurrence: 'daily' })]), { type: 'archiveCard', id: '1' })
+    expect(s.cards[1].due).toBe(inDays(1))
+  })
+
+  it('archiving a non-recurring card adds nothing, and re-archiving is a no-op', () => {
+    const once = reducer(board([card('1')]), { type: 'archiveCard', id: '1' })
+    expect(once.cards).toHaveLength(1)
+    expect(reducer(once, { type: 'archiveCard', id: '1' })).toBe(once)
+  })
+
+  it('survives import; unknown recurrence values are dropped', () => {
+    const s = parseBoard({
+      columns: [{ id: 'a', name: 'A' }],
+      cards: [
+        { id: 'x', title: 'X', columnId: 'a', recurrence: 'weekly' },
+        { id: 'y', title: 'Y', columnId: 'a', recurrence: 'hourly' },
+      ],
+    })
+    expect(s.cards.map((c) => c.recurrence)).toEqual(['weekly', undefined])
+  })
+})
+
+describe('templates', () => {
+  const tpl = { id: 't1', name: 'Bug report', notes: 'Steps:', priority: 'high' as const, tags: ['bug'], checklist: ['Reproduce', 'Fix'] }
+
+  it('saves, replaces by id and deletes templates', () => {
+    let s = reducer(board([]), { type: 'saveTemplate', template: tpl })
+    expect(s.templates).toEqual([tpl])
+    s = reducer(s, { type: 'saveTemplate', template: { ...tpl, name: 'Bug' } })
+    expect(s.templates).toEqual([{ ...tpl, name: 'Bug' }])
+    s = reducer(s, { type: 'deleteTemplate', id: 't1' })
+    expect(s.templates).toBeUndefined()
+  })
+
+  it('creates a card from a template with fresh unchecked checklist items', () => {
+    const s = reducer(
+      { ...board([]), templates: [tpl] },
+      { type: 'addCardFromTemplate', id: 'new', templateId: 't1', columnId: 'b' },
+    )
+    expect(s.cards).toHaveLength(1)
+    expect(s.cards[0]).toMatchObject({ id: 'new', title: 'Bug report', columnId: 'b', notes: 'Steps:', priority: 'high', tags: ['bug'] })
+    expect(s.cards[0].checklist?.map((i) => [i.text, i.done])).toEqual([['Reproduce', false], ['Fix', false]])
+    expect(new Set(s.cards[0].checklist!.map((i) => i.id)).size).toBe(2)
+  })
+
+  it('ignores unknown templates and columns', () => {
+    const start = { ...board([]), templates: [tpl] }
+    expect(reducer(start, { type: 'addCardFromTemplate', id: 'n', templateId: 'nope', columnId: 'a' })).toBe(start)
+    expect(reducer(start, { type: 'addCardFromTemplate', id: 'n', templateId: 't1', columnId: 'zzz' })).toBe(start)
+  })
+
+  it('are kept when a column is deleted and when exporting/importing', () => {
+    const start = { ...board([card('1')]), templates: [tpl] }
+    expect(reducer(start, { type: 'deleteColumn', id: 'a' }).templates).toEqual([tpl])
+    expect(parseBoard(JSON.parse(JSON.stringify(start)))).toEqual(start)
+  })
+
+  it('import cleans up malformed templates', () => {
+    const s = parseBoard({
+      columns: [{ id: 'a', name: 'A' }],
+      cards: [],
+      templates: [{ id: 'ok', name: ' Good ', checklist: [' a ', '', 3], priority: 'urgent' }, { id: 'bad' }, 'junk'],
+    })
+    expect(s.templates).toEqual([{ id: 'ok', name: 'Good', checklist: ['a'] }])
+  })
+})
+
+describe('importCards', () => {
+  it('appends new columns and cards without touching existing ones', () => {
+    const start = board([card('1')])
+    const s = reducer(start, {
+      type: 'importCards',
+      columns: [{ id: 'n', name: 'New' }],
+      cards: [card('2', 'n'), card('3', 'a')],
+    })
+    expect(s.columns.map((c) => c.id)).toEqual(['a', 'b', 'n'])
+    expect(s.cards.map((c) => c.id)).toEqual(['1', '2', '3'])
+  })
+
+  it('is a no-op when there is nothing to add', () => {
+    const start = board([card('1')])
+    expect(reducer(start, { type: 'importCards', columns: [], cards: [] })).toBe(start)
+  })
+})

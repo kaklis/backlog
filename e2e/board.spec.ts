@@ -86,7 +86,8 @@ test('shortcuts: "/" focuses search, Ctrl+Z restores a deleted card', async ({ p
 
 test('exports the board as JSON', async ({ page }) => {
   await addCard(page, 'Backlog', 'Exported')
-  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export', exact: true }).click()])
+  await page.getByTitle('Export or import this board').click()
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'Export JSON' }).click()])
   expect(download.suggestedFilename()).toMatch(/^backlog-\d{4}-\d{2}-\d{2}\.json$/)
   const body = JSON.parse(await readFile((await download.path())!, 'utf8'))
   expect(body.cards.map((c: { title: string }) => c.title)).toEqual(['Exported'])

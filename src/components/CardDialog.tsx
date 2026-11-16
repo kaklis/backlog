@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { uid, type Card, type ChecklistItem, type Column, type Dispatch, type Priority } from '../store'
+import { uid, type Card, type ChecklistItem, type Column, type Dispatch, type Priority, type Recurrence } from '../store'
+import { Markdown } from '../markdown'
 import { cleanTag, tagHue } from '../tags'
-import { ArchiveIcon, PlusIcon, TrashIcon, XIcon } from './Icons'
+import { ArchiveIcon, PlusIcon, TemplateIcon, TrashIcon, XIcon } from './Icons'
 
 interface Props {
   card: Card
@@ -17,6 +18,9 @@ export function CardDialog({ card, columns, allTags, dispatch, onClose }: Props)
   const [notes, setNotes] = useState(card.notes ?? '')
   const [priority, setPriority] = useState<Priority | ''>(card.priority ?? '')
   const [due, setDue] = useState(card.due ?? '')
+  const [recurrence, setRecurrence] = useState<Recurrence | ''>(card.recurrence ?? '')
+  const [preview, setPreview] = useState(false)
+  const [templateName, setTemplateName] = useState<string | null>(null) // non-null while naming a template
   const [columnId, setColumnId] = useState(card.columnId)
   const [tags, setTags] = useState<string[]>(card.tags ?? [])
   const [tagDraft, setTagDraft] = useState('')
@@ -54,12 +58,31 @@ export function CardDialog({ card, columns, allTags, dispatch, onClose }: Props)
         notes: notes.trim() || undefined,
         priority: priority || undefined,
         due: due || undefined,
+        recurrence: recurrence || undefined,
         tags: finalTags.length ? finalTags : undefined,
         checklist: finalItems.length ? finalItems : undefined,
       },
     })
     if (columnId !== card.columnId) dispatch({ type: 'moveCard', id: card.id, columnId })
     ref.current?.close()
+  }
+
+  const saveAsTemplate = () => {
+    const name = (templateName ?? '').trim()
+    if (!name) return
+    dispatch({
+      type: 'saveTemplate',
+      template: {
+        id: uid(),
+        name,
+        notes: notes.trim() || undefined,
+        priority: priority || undefined,
+        tags: tags.length ? tags : undefined,
+        checklist: items.length ? items.map((i) => i.text) : undefined,
+        recurrence: recurrence || undefined,
+      },
+    })
+    setTemplateName(null)
   }
 
   const archive = () => {
@@ -98,10 +121,28 @@ export function CardDialog({ card, columns, allTags, dispatch, onClose }: Props)
       </div>
 
       <div className="dialog-body">
-        <label className="field-label">
-          Notes
-          <textarea value={notes} rows={4} placeholder="Add details…" onChange={(e) => setNotes(e.target.value)} />
-        </label>
+        <div className="field-label">
+          <span className="notes-head">
+            Notes
+            <span className="seg" role="tablist" aria-label="Notes view">
+              <button role="tab" aria-selected={!preview} className={!preview ? 'on' : ''} onClick={() => setPreview(false)}>Write</button>
+              <button role="tab" aria-selected={preview} className={preview ? 'on' : ''} onClick={() => setPreview(true)}>Preview</button>
+            </span>
+          </span>
+          {preview ? (
+            <div className="notes-preview">
+              {notes.trim() ? <Markdown text={notes} /> : <span className="muted">Nothing to preview. Markdown works: **bold**, *italic*, - lists, [links](https://…).</span>}
+            </div>
+          ) : (
+            <textarea
+              value={notes}
+              rows={4}
+              aria-label="Notes"
+              placeholder="Add details… (Markdown supported)"
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          )}
+        </div>
 
         <div className="grid3">
           <label className="field-label">
@@ -122,6 +163,15 @@ export function CardDialog({ card, columns, allTags, dispatch, onClose }: Props)
           <label className="field-label">
             Due date
             <input className="field" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          </label>
+          <label className="field-label">
+            Repeat
+            <select className="field" value={recurrence} onChange={(e) => setRecurrence(e.target.value as Recurrence | '')}>
+              <option value="">Never</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
           </label>
         </div>
 
@@ -197,9 +247,30 @@ export function CardDialog({ card, columns, allTags, dispatch, onClose }: Props)
         </div>
       </div>
 
+      {templateName !== null && (
+        <div className="template-save">
+          <input
+            autoFocus
+            aria-label="Template name"
+            placeholder="Template name"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveAsTemplate()
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                setTemplateName(null)
+              }
+            }}
+          />
+          <button className="primary" onClick={saveAsTemplate} disabled={!templateName.trim()}>Save template</button>
+          <button className="ghost" onClick={() => setTemplateName(null)}>Cancel</button>
+        </div>
+      )}
       <div className="dialog-foot">
         <button className="ghost danger" onClick={remove}><TrashIcon />Delete</button>
         <button className="ghost" onClick={archive}><ArchiveIcon />Archive</button>
+        <button className="ghost" onClick={() => setTemplateName(title.trim())}><TemplateIcon />Make template</button>
         <span className="spacer" />
         <button className="ghost" onClick={() => ref.current?.close()}>Cancel</button>
         <button className="primary" onClick={save} disabled={!title.trim()}>Save</button>

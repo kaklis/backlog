@@ -1,15 +1,11 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card as CardT, Dispatch } from '../store'
-import { todayString } from '../dates'
+import { dueStatus, formatDue } from '../dates'
+import { Markdown } from '../markdown'
 import { tagHue } from '../tags'
-import { CalendarIcon, ChecklistIcon, XIcon } from './Icons'
+import { CalendarIcon, ChecklistIcon, RepeatIcon, XIcon } from './Icons'
 
-
-function formatDue(due: string) {
-  const [y, m, d] = due.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 interface Props {
   card: CardT
@@ -25,7 +21,7 @@ export function CardView({ card, dispatch, onOpen, overlay }: Props) {
   })
   const checklist = card.checklist ?? []
   const doneCount = checklist.filter((i) => i.done).length
-  const hasMeta = card.priority || card.due || checklist.length > 0
+  const hasMeta = card.priority || card.due || card.recurrence || checklist.length > 0
 
   return (
     <div
@@ -34,10 +30,15 @@ export function CardView({ card, dispatch, onOpen, overlay }: Props) {
       className={`card${isDragging ? ' dragging' : ''}${overlay ? ' overlay' : ''}`}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}
+      // a card contains a delete button, so it cannot be role=button (nested interactive); aria-pressed only applies to buttons
+      role="group"
+      aria-pressed={undefined}
+      aria-label={card.title}
       {...listeners}
       onClick={() => onOpen?.(card.id)}
       onKeyDown={(e) => {
-        listeners?.onKeyDown?.(e)
+        // while this card is being dragged, Space/Escape belong to the active drag (drop / cancel), not a new activation
+        if (!isDragging) listeners?.onKeyDown?.(e)
         if (e.key === 'Enter' && e.target === e.currentTarget) onOpen?.(card.id)
       }}
     >
@@ -49,14 +50,20 @@ export function CardView({ card, dispatch, onOpen, overlay }: Props) {
         </div>
       )}
       <div className="card-title">{card.title}</div>
-      {card.notes && <div className="card-notes">{card.notes}</div>}
+      {card.notes && <Markdown className="card-notes" text={card.notes} />}
       {hasMeta && (
         <div className="card-meta">
           {card.priority && <span className={`badge ${card.priority}`}>{card.priority}</span>}
           {card.due && (
-            <span className={`due${card.due < todayString() ? ' overdue' : ''}`}>
+            <span className={`due ${dueStatus(card.due)}`}>
               <CalendarIcon />
               {formatDue(card.due)}
+            </span>
+          )}
+          {card.recurrence && (
+            <span className="repeat" title={`Repeats ${card.recurrence}`}>
+              <RepeatIcon />
+              <span className="sr-only">Repeats {card.recurrence}</span>
             </span>
           )}
           {checklist.length > 0 && (

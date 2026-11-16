@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useReducer } from 'react'
+import { nextDue, RECURRENCES, type Recurrence } from './dates'
+
+export type { Recurrence }
 
 export interface Card {
   id: string
@@ -8,6 +11,7 @@ export interface Card {
   due?: string // YYYY-MM-DD
   tags?: string[]
   checklist?: ChecklistItem[]
+  recurrence?: Recurrence // archiving the card adds the next occurrence
   archivedAt?: number // set when the card is archived; hidden from the board
   columnId: string
   createdAt: number
@@ -23,9 +27,19 @@ export interface Column {
   name: string
   wipLimit?: number // soft limit on active (non-archived) cards; exceeding it only warns
 }
+export interface Template {
+  id: string
+  name: string
+  notes?: string
+  priority?: Priority
+  tags?: string[]
+  checklist?: string[] // item texts; copies start unchecked
+  recurrence?: Recurrence
+}
 export interface BoardState {
   columns: Column[]
   cards: Card[]
+  templates?: Template[]
 }
 
 export type Action =
@@ -42,8 +56,12 @@ export type Action =
   | { type: 'setWipLimit'; id: string; limit?: number }
   | { type: 'deleteColumn'; id: string }
   | { type: 'replace'; state: BoardState }
+  | { type: 'saveTemplate'; template: Template }
+  | { type: 'deleteTemplate'; id: string }
+  | { type: 'addCardFromTemplate'; id: string; templateId: string; columnId: string }
+  | { type: 'importCards'; columns: Column[]; cards: Card[] } // appended to the board (new columns first)
 
-const KEY = 'backlog.v1'
+export const DEFAULT_STORAGE_KEY = 'backlog.v1'
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
 const initial: BoardState = {
@@ -55,9 +73,9 @@ const initial: BoardState = {
   cards: [],
 }
 
-function load(): BoardState {
+function load(key: string): BoardState {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(key)
     if (raw) return JSON.parse(raw) as BoardState
   } catch {
     /* storage unavailable or corrupt */
@@ -83,6 +101,28 @@ function parseChecklist(v: unknown): ChecklistItem[] | undefined {
       return { id: typeof o.id === 'string' ? o.id : uid(), text: (o.text as string).trim(), done: o.done === true }
     })
   return items.length ? items : undefined
+}
+
+function parseTemplates(v: unknown): Template[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out = v
+    .filter((t) => isObj(t) && typeof t.id === 'string' && typeof t.name === 'string' && t.name.trim())
+    .map((t): Template => {
+      const o = t as Record<string, unknown>
+      const items = Array.isArray(o.checklist)
+        ? o.checklist.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim())
+        : []
+      return {
+        id: o.id as string,
+        name: (o.name as string).trim(),
+        notes: typeof o.notes === 'string' && o.notes ? o.notes : undefined,
+        priority: PRIORITIES.includes(o.priority as string) ? (o.priority as Priority) : undefined,
+        tags: parseTags(o.tags),
+        checklist: items.length ? items : undefined,
+        recurrence: RECURRENCES.includes(o.recurrence as Recurrence) ? (o.recurrence as Recurrence) : undefined,
+      }
+    })
+  return out.length ? out : undefined
 }
 
 /** Returns a cleaned BoardState from imported JSON, or throws an Error describing what is wrong. */
@@ -111,11 +151,35 @@ export function parseBoard(data: unknown): BoardState {
       priority: PRIORITIES.includes(c.priority as string) ? (c.priority as Priority) : undefined,
       tags: parseTags(c.tags),
       checklist: parseChecklist(c.checklist),
+      recurrence: RECURRENCES.includes(c.recurrence as Recurrence) ? (c.recurrence as Recurrence) : undefined,
       archivedAt: typeof c.archivedAt === 'number' ? c.archivedAt : undefined,
       due: typeof c.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.due) ? c.due : undefined,
     }
   })
-  return { columns, cards }
+  const templates = parseTemplates(data.templates)
+  return templates ? { columns, cards, templates } : { columns, cards }
+}
+
+/** Archives the given cards; archiving a recurring card also adds its next occurrence to the same column. */
+function archive(s: BoardState, ids: Set<string>): BoardState {
+  const now = Date.now()
+  const next: Card[] = []
+  const cards = s.cards.map((c) => {
+    if (!ids.has(c.id) || c.archivedAt) return c
+    if (c.recurrence) {
+      next.push({
+        ...c,
+        id: uid(),
+        createdAt: now,
+        archivedAt: undefined,
+        due: nextDue(c.due, c.recurrence, new Date(now)),
+        checklist: c.checklist?.map((i) => ({ ...i, id: uid(), done: false })),
+      })
+    }
+    return { ...c, archivedAt: now }
+  })
+  const changed = cards.some((c, i) => c !== s.cards[i])
+  return changed ? { ...s, cards: [...cards, ...next] } : s
 }
 
 export function reducer(s: BoardState, a: Action): BoardState {
@@ -135,13 +199,38 @@ export function reducer(s: BoardState, a: Action): BoardState {
     case 'deleteCard':
       return s.cards.some((c) => c.id === a.id) ? { ...s, cards: s.cards.filter((c) => c.id !== a.id) } : s
     case 'archiveCard':
-      return { ...s, cards: s.cards.map((c) => (c.id === a.id && !c.archivedAt ? { ...c, archivedAt: Date.now() } : c)) }
+      return archive(s, new Set([a.id]))
     case 'unarchiveCard':
       return { ...s, cards: s.cards.map((c) => (c.id === a.id ? { ...c, archivedAt: undefined } : c)) }
-    case 'archiveCards': {
-      const now = Date.now()
-      const ids = new Set(a.ids)
-      return { ...s, cards: s.cards.map((c) => (ids.has(c.id) && !c.archivedAt ? { ...c, archivedAt: now } : c)) }
+    case 'archiveCards':
+      return archive(s, new Set(a.ids))
+    case 'saveTemplate': {
+      const rest = (s.templates ?? []).filter((t) => t.id !== a.template.id)
+      return { ...s, templates: [...rest, a.template] }
+    }
+    case 'deleteTemplate': {
+      const templates = (s.templates ?? []).filter((t) => t.id !== a.id)
+      return { ...s, templates: templates.length ? templates : undefined }
+    }
+    case 'addCardFromTemplate': {
+      const t = s.templates?.find((x) => x.id === a.templateId)
+      if (!t || !s.columns.some((c) => c.id === a.columnId)) return s
+      const card: Card = {
+        id: a.id,
+        title: t.name,
+        columnId: a.columnId,
+        createdAt: Date.now(),
+        notes: t.notes,
+        priority: t.priority,
+        tags: t.tags,
+        checklist: t.checklist?.map((text) => ({ id: uid(), text, done: false })),
+        recurrence: t.recurrence,
+      }
+      return { ...s, cards: [...s.cards, card] }
+    }
+    case 'importCards': {
+      if (!a.cards.length && !a.columns.length) return s
+      return { ...s, columns: [...s.columns, ...a.columns], cards: [...s.cards, ...a.cards] }
     }
     case 'moveCard': {
       const card = s.cards.find((c) => c.id === a.id)
@@ -171,6 +260,7 @@ export function reducer(s: BoardState, a: Action): BoardState {
         : { ...s, columns: s.columns.map((c) => (c.id === a.id ? { ...c, wipLimit: a.limit } : c)) }
     case 'deleteColumn':
       return {
+        ...s,
         columns: s.columns.filter((c) => c.id !== a.id),
         cards: s.cards.filter((c) => c.columnId !== a.id),
       }
@@ -230,16 +320,16 @@ export function historyReducer(h: History, a: HistoryAction): History {
   }
 }
 
-export function useBoard() {
-  const [h, dispatchH] = useReducer(historyReducer, undefined, () => ({ present: load(), past: [], future: [] }))
+export function useBoard(storageKey: string = DEFAULT_STORAGE_KEY) {
+  const [h, dispatchH] = useReducer(historyReducer, undefined, () => ({ present: load(storageKey), past: [], future: [] }))
   const state = h.present
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(state))
+      localStorage.setItem(storageKey, JSON.stringify(state))
     } catch {
       /* ignore */
     }
-  }, [state])
+  }, [state, storageKey])
   const dispatch = useCallback((a: Action) => dispatchH(a), [])
   const undo = useCallback(() => dispatchH({ type: 'undo' }), [])
   const redo = useCallback(() => dispatchH({ type: 'redo' }), [])

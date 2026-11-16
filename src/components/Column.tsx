@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import type { Card, Column as ColumnT, Dispatch } from '../store'
+import { useDismiss } from '../hooks'
+import { uid, type Card, type Column as ColumnT, type Dispatch, type Template } from '../store'
 import { CardView } from './Card'
-import { ArchiveIcon, XIcon } from './Icons'
+import { ArchiveIcon, PencilIcon, TemplateIcon, XIcon } from './Icons'
 
 export function ColumnView({
   column,
   cards,
   totalCount,
   activeCount,
+  templates,
   dispatch,
   onOpen,
 }: {
@@ -17,6 +19,7 @@ export function ColumnView({
   cards: Card[] // the cards currently shown (after search / filters)
   totalCount: number // every card in the column, including hidden and archived ones
   activeCount: number // non-archived cards, whatever the filters hide: what the WIP limit measures
+  templates: Template[]
   dispatch: Dispatch
   onOpen: (id: string) => void
 }) {
@@ -45,6 +48,15 @@ export function ColumnView({
     const n = Math.floor(Number(raw))
     const next = raw.trim() && Number.isFinite(n) && n > 0 ? n : undefined
     dispatch({ type: 'setWipLimit', id: column.id, limit: next })
+  }
+
+  const menuRef = useRef<HTMLDetailsElement>(null)
+  useDismiss(menuRef)
+  const fromTemplate = (t: Template) => {
+    const id = uid()
+    dispatch({ type: 'addCardFromTemplate', id, templateId: t.id, columnId: column.id })
+    if (menuRef.current) menuRef.current.open = false
+    onOpen(id) // let the user name the new card straight away
   }
 
   const remove = () => {
@@ -90,6 +102,7 @@ export function ColumnView({
             onClick={() => setEditingLimit(true)}
           >
             {limit === undefined ? cards.length : `${activeCount}/${limit}`}
+            <PencilIcon className="edit-hint" />
           </button>
         )}
         <button
@@ -110,13 +123,42 @@ export function ColumnView({
           ))}
         </SortableContext>
       </div>
-      <input
-        className="add"
-        placeholder="+ Add card"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && add()}
-      />
+      <div className="add-row">
+        <input
+          className="add"
+          placeholder="+ Add card"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+        />
+        {templates.length > 0 && (
+          <details className="menu templates" ref={menuRef}>
+            <summary className="icon-summary" title="New card from a template" aria-label="New card from a template">
+              <TemplateIcon />
+            </summary>
+            <div className="menu-panel template-list" role="menu">
+              {templates.map((t) => (
+                <div key={t.id} className="template-item">
+                  <button role="menuitem" className="ghost" onClick={() => fromTemplate(t)}>
+                    {t.name}
+                    <span className="muted small">
+                      {[t.priority, t.tags?.join(', '), t.checklist && `${t.checklist.length} items`].filter(Boolean).join(' · ')}
+                    </span>
+                  </button>
+                  <button
+                    className="icon danger"
+                    aria-label={`Delete template ${t.name}`}
+                    title="Delete template"
+                    onClick={() => dispatch({ type: 'deleteTemplate', id: t.id })}
+                  >
+                    <XIcon />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
     </section>
   )
 }

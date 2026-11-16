@@ -18,7 +18,8 @@ export type BackupStatus = 'off' | 'needs-permission' | 'on' | 'error'
 // The chosen file handle is kept in IndexedDB so the link survives reloads.
 const DB = 'backlog'
 const STORE = 'kv'
-const KEY = 'backupHandle'
+// the first board keeps the original key so existing links survive; other boards get their own
+const handleKey = (boardId: string) => (boardId === 'main' ? 'backupHandle' : `backupHandle:${boardId}`)
 
 function idb<T>(run: (s: IDBObjectStore) => IDBRequest<T>, mode: IDBTransactionMode): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -32,11 +33,14 @@ function idb<T>(run: (s: IDBObjectStore) => IDBRequest<T>, mode: IDBTransactionM
     }
   })
 }
-const loadHandle = () => idb<Handle | undefined>((s) => s.get(KEY), 'readonly').catch(() => undefined)
-const storeHandle = (h: Handle) => idb((s) => s.put(h, KEY), 'readwrite').catch(() => undefined)
-const clearHandle = () => idb((s) => s.delete(KEY), 'readwrite').catch(() => undefined)
+const loadHandle = (id: string) => idb<Handle | undefined>((s) => s.get(handleKey(id)), 'readonly').catch(() => undefined)
+const storeHandle = (id: string, h: Handle) => idb((s) => s.put(h, handleKey(id)), 'readwrite').catch(() => undefined)
+const clearHandle = (id: string) => idb((s) => s.delete(handleKey(id)), 'readwrite').catch(() => undefined)
 
-export function useFileBackup(state: BoardState, dispatch: Dispatch) {
+/** Forget a board's backup file link (used when the board is deleted). */
+export const forgetBackup = (boardId: string) => (backupSupported ? clearHandle(boardId) : Promise.resolve())
+
+export function useFileBackup(state: BoardState, dispatch: Dispatch, boardId = 'main') {
   const [handle, setHandle] = useState<Handle | null>(null)
   const [status, setStatus] = useState<BackupStatus>('off')
   const [savedAt, setSavedAt] = useState<Date | null>(null)
@@ -94,7 +98,7 @@ export function useFileBackup(state: BoardState, dispatch: Dispatch) {
     if (!backupSupported) return
     let cancelled = false
     ;(async () => {
-      const h = await loadHandle()
+      const h = await loadHandle(boardId)
       if (!h || cancelled) return
       setHandle(h)
       if ((await h.queryPermission({ mode: 'readwrite' })) === 'granted') {
@@ -105,7 +109,7 @@ export function useFileBackup(state: BoardState, dispatch: Dispatch) {
     return () => {
       cancelled = true
     }
-  }, [reconcile])
+  }, [reconcile, boardId])
 
   // autosave shortly after each change
   useEffect(() => {
@@ -120,7 +124,7 @@ export function useFileBackup(state: BoardState, dispatch: Dispatch) {
         suggestedName: 'backlog-backup.json',
         types: [{ description: 'Backlog backup', accept: { 'application/json': ['.json'] } }],
       })
-      await storeHandle(h)
+      await storeHandle(boardId, h)
       setHandle(h)
       setStatus('on')
       await reconcile(h)
@@ -141,7 +145,7 @@ export function useFileBackup(state: BoardState, dispatch: Dispatch) {
   }
 
   const disconnect = async () => {
-    await clearHandle()
+    await clearHandle(boardId)
     setHandle(null)
     setStatus('off')
     setSavedAt(null)
