@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Card, Column as ColumnT, Dispatch } from '../store'
 import { CardView } from './Card'
+import { XIcon } from './Icons'
 
 export function ColumnView({ column, cards, dispatch }: { column: ColumnT; cards: Card[]; dispatch: Dispatch }) {
   const [draft, setDraft] = useState('')
@@ -32,7 +33,7 @@ export function ColumnView({ column, cards, dispatch }: { column: ColumnT; cards
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
         <span className="count">{cards.length}</span>
-        <button className="icon" aria-label="Delete column" onClick={remove}>×</button>
+        <button className="icon" aria-label="Delete column" title="Delete column" onClick={remove}><XIcon /></button>
       </header>
       <div ref={setNodeRef} className="cards">
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>

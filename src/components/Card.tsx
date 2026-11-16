@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card as CardT, Dispatch, Priority } from '../store'
+import { CalendarIcon, XIcon } from './Icons'
 
 const today = () => new Date().toLocaleDateString('sv') // YYYY-MM-DD in local time
 
@@ -50,17 +51,17 @@ export function CardView({ card, dispatch, overlay }: { card: CardT; dispatch?: 
         />
         <textarea placeholder="Notes" value={notes} rows={3} onChange={(e) => setNotes(e.target.value)} />
         <div className="row">
-          <select value={priority} aria-label="Priority" onChange={(e) => setPriority(e.target.value as Priority | '')}>
+          <select className="field" value={priority} aria-label="Priority" onChange={(e) => setPriority(e.target.value as Priority | '')}>
             <option value="">No priority</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
-          <input type="date" value={due} aria-label="Due date" onChange={(e) => setDue(e.target.value)} />
+          <input className="field" type="date" value={due} aria-label="Due date" onChange={(e) => setDue(e.target.value)} />
         </div>
         <div className="row">
+          <button className="ghost" onClick={() => setEditing(false)}>Cancel</button>
           <button className="primary" onClick={save}>Save</button>
-          <button onClick={() => setEditing(false)}>Cancel</button>
         </div>
       </div>
     )
@@ -80,7 +81,12 @@ export function CardView({ card, dispatch, overlay }: { card: CardT; dispatch?: 
       {(card.priority || card.due) && (
         <div className="card-meta">
           {card.priority && <span className={`badge ${card.priority}`}>{card.priority}</span>}
-          {card.due && <span className={`due${card.due < today() ? ' overdue' : ''}`}>{formatDue(card.due)}</span>}
+          {card.due && (
+            <span className={`due${card.due < today() ? ' overdue' : ''}`}>
+              <CalendarIcon />
+              {formatDue(card.due)}
+            </span>
+          )}
         </div>
       )}
       {dispatch && (
@@ -93,7 +99,7 @@ export function CardView({ card, dispatch, overlay }: { card: CardT; dispatch?: 
             dispatch({ type: 'deleteCard', id: card.id })
           }}
         >
-          ×
+          <XIcon />
         </button>
       )}
     </div>

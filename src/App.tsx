@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core'
 import { parseBoard, useBoard, type Card, type Dispatch, type Priority } from './store'
 import { ColumnView } from './components/Column'
+import { BoardIcon, DownloadIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, UploadIcon } from './components/Icons'
 import { CardView } from './components/Card'
 
 type Filter = Priority | 'none' | 'all'
@@ -197,38 +198,41 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
-        <h1>Backlog</h1>
+        <div className="brand">
+          <span className="brand-mark"><BoardIcon /></span>
+          <h1>Backlog</h1>
+        </div>
         <div className="controls">
-          <input
-            ref={searchRef}
-            className="search"
-            type="search"
-            placeholder="Search cards  ( / )"
-            aria-label="Search cards by title"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-          />
-          <label>
-            Filter
-            <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
-              <option value="all">All priorities</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-              <option value="none">No priority</option>
-            </select>
-          </label>
-          <label>
-            Sort
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="manual">Manual</option>
-              <option value="priority">Priority</option>
-              <option value="due">Due date</option>
-            </select>
-          </label>
-          <button onClick={exportBoard}>Export</button>
-          <button onClick={() => importRef.current?.click()}>Import</button>
+          <div className="search-wrap">
+            <SearchIcon />
+            <input
+              ref={searchRef}
+              className="search"
+              type="search"
+              placeholder="Search cards  ( / )"
+              aria-label="Search cards by title"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+            />
+          </div>
+          <select className="field" aria-label="Filter by priority" value={filter}
+            onChange={(e) => setFilter(e.target.value as Filter)}>
+            <option value="all">All priorities</option>
+            <option value="high">High priority</option>
+            <option value="medium">Medium priority</option>
+            <option value="low">Low priority</option>
+            <option value="none">No priority</option>
+          </select>
+          <select className="field" aria-label="Sort cards" value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}>
+            <option value="manual">Sort: Manual</option>
+            <option value="priority">Sort: Priority</option>
+            <option value="due">Sort: Due date</option>
+          </select>
+          <span className="divider" />
+          <button className="ghost" onClick={exportBoard}><DownloadIcon />Export</button>
+          <button className="ghost" onClick={() => importRef.current?.click()}><UploadIcon />Import</button>
           <input
             ref={importRef}
             type="file"
@@ -240,9 +244,9 @@ export default function App() {
               e.target.value = '' // allow re-importing the same file
             }}
           />
-          <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle dark mode"
+          <button className="icon square" onClick={toggleTheme} aria-label="Toggle dark mode"
             title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}>
-            {theme === 'dark' ? '☀' : '☾'}
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
         </div>
       </div>
@@ -264,7 +268,7 @@ export default function App() {
             />
           ))}
           <button className="add-col" onClick={() => dispatch({ type: 'addColumn', name: 'New column' })}>
-            + Column
+            <PlusIcon />Add column
           </button>
         </main>
         <DragOverlay>{active && <CardView card={active} overlay />}</DragOverlay>
