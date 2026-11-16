@@ -26,7 +26,7 @@ jobs:
       - name: Type-check and build
         run: npm run build
       - name: Unit and component tests
-        run: npm test
+        run: npx vitest run --reporter=default --reporter=github-actions
       - name: Install Playwright's Chromium
         run: npx playwright install --with-deps chromium
       - name: End-to-end tests
