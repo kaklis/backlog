@@ -261,3 +261,40 @@ describe('undo history', () => {
     expect(h.past.length).toBe(100)
   })
 })
+
+describe('WIP limits', () => {
+  it('sets, changes and clears a column limit', () => {
+    let s = reducer(board([]), { type: 'setWipLimit', id: 'a', limit: 3 })
+    expect(s.columns[0].wipLimit).toBe(3)
+    expect(s.columns[1].wipLimit).toBeUndefined()
+    s = reducer(s, { type: 'setWipLimit', id: 'a', limit: 5 })
+    expect(s.columns[0].wipLimit).toBe(5)
+    s = reducer(s, { type: 'setWipLimit', id: 'a', limit: undefined })
+    expect(s.columns[0].wipLimit).toBeUndefined()
+  })
+
+  it('is a no-op (not an undo step) when the limit does not change', () => {
+    const s = reducer(board([]), { type: 'setWipLimit', id: 'a', limit: 3 })
+    expect(reducer(s, { type: 'setWipLimit', id: 'a', limit: 3 })).toBe(s)
+    expect(reducer(s, { type: 'setWipLimit', id: 'b', limit: undefined })).toBe(s)
+  })
+
+  it('can be undone', () => {
+    const h = { present: board([]), past: [], future: [] }
+    const set = historyReducer(h, { type: 'setWipLimit', id: 'a', limit: 2 })
+    expect(historyReducer(set, { type: 'undo' }).present.columns[0].wipLimit).toBeUndefined()
+  })
+
+  it('survives import, and invalid limits are dropped', () => {
+    const parsed = parseBoard({
+      columns: [
+        { id: 'a', name: 'A', wipLimit: 4 },
+        { id: 'b', name: 'B', wipLimit: 0 },
+        { id: 'c', name: 'C', wipLimit: 2.5 },
+        { id: 'd', name: 'D', wipLimit: '3' },
+      ],
+      cards: [],
+    })
+    expect(parsed.columns.map((c) => c.wipLimit)).toEqual([4, undefined, undefined, undefined])
+  })
+})

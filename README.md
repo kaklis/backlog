@@ -43,12 +43,14 @@ The e2e tests use the Edge/Chrome already installed on your machine. To use Play
 
 **Columns**
 - Click a column name to rename it. × deletes the column and its cards (asks first if it has cards).
+- **WIP limits:** click the count next to a column name to set a limit (leave it empty to remove it). The count then reads `used/limit`, turns amber when the column is full and red, with a red outline, when it is over. The limit is a warning only: you can still add or drop cards. It counts every active card in the column, whatever search or filters are hiding, and ignores archived cards.
 - "+ Column" adds a new one.
 
 **Finding things**
 - Search by title or tag with the search box. Esc clears it.
 - Filter by tag with the tag dropdown (appears once any card has tags).
 - Filter by priority (All, High, Medium, Low, No priority).
+- Filter by due date: Overdue, Due today, Due this week (today through Sunday; earlier days of the week count as overdue), or No due date. The week runs Monday to Sunday.
 - Sort by Manual (your drag order), Priority, or Due date. Sorting and filtering only change what you see, not the stored order.
 - Overdue due dates are shown in red.
 
@@ -84,7 +86,7 @@ With a card focused (Tab to one):
 
 ## Data and storage
 
-Everything is stored in this browser under these `localStorage` keys: `backlog.v1` (board), `backlog.filter`, `backlog.sort`, `backlog.theme`. Clearing site data erases the board, so turn on file backup (or use Export). Data is not shared between browsers or devices; use Export / Import to move it.
+Everything is stored in this browser under these `localStorage` keys: `backlog.v1` (board), `backlog.filter`, `backlog.sort`, `backlog.due`, `backlog.theme`. Clearing site data erases the board, so turn on file backup (or use Export). Data is not shared between browsers or devices; use Export / Import to move it.
 
 ## Project layout
 
@@ -100,6 +102,7 @@ src/
   components/BackupMenu.tsx  backup status and controls
   components/ArchivePanel.tsx  archived cards: restore / delete
   components/ShortcutsHelp.tsx keyboard shortcut list
+  dates.ts              due-date helpers (today, week range, due filters)
   hooks.ts              usePersisted, useTheme
   tags.ts               tag color + normalization helpers
   test/setup.ts         Vitest setup (jsdom polyfills)

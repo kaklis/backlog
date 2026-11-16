@@ -140,3 +140,34 @@ test('keyboard: focus a card, reorder it, change priority and archive it', async
   await page.getByRole('button', { name: /^archive/i }).first().click()
   await expect(page.getByRole('dialog', { name: 'Archive' })).toContainText('First')
 })
+
+test('WIP limit: set from the column header, warns when exceeded, never blocks', async ({ page }) => {
+  await addCard(page, 'In progress', 'One')
+  await addCard(page, 'In progress', 'Two')
+  const doing = column(page, 'In progress')
+  await doing.getByTitle(/wip limit/i).click()
+  await page.getByRole('spinbutton', { name: 'WIP limit' }).fill('2')
+  await page.getByRole('spinbutton', { name: 'WIP limit' }).press('Enter')
+  await expect(doing.getByTitle(/wip limit/i)).toHaveText('2/2')
+  await expect(doing).not.toHaveClass(/over-limit/)
+
+  await addCard(page, 'In progress', 'Three') // over the limit: allowed, but flagged
+  await expect(doing.getByTitle(/wip limit/i)).toHaveText('3/2')
+  await expect(doing).toHaveClass(/over-limit/)
+
+  await page.reload() // limits persist
+  await expect(column(page, 'In progress').getByTitle(/wip limit/i)).toHaveText('3/2')
+})
+
+test('due date filter narrows the board to overdue cards', async ({ page }) => {
+  await addCard(page, 'Backlog', 'Late')
+  await addCard(page, 'Backlog', 'Later')
+  await page.getByText('Late', { exact: true }).click()
+  await page.getByRole('dialog').getByLabel('Due date').fill('2020-01-01')
+  await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
+
+  await page.getByLabel('Filter by due date').selectOption('overdue')
+  expect(await titles(page, 'Backlog')).toEqual(['Late'])
+  await page.getByLabel('Filter by due date').selectOption('none')
+  expect(await titles(page, 'Backlog')).toEqual(['Later'])
+})

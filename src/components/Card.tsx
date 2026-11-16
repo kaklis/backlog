@@ -1,10 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card as CardT, Dispatch } from '../store'
+import { todayString } from '../dates'
 import { tagHue } from '../tags'
 import { CalendarIcon, ChecklistIcon, XIcon } from './Icons'
 
-const today = () => new Date().toLocaleDateString('sv') // YYYY-MM-DD in local time
 
 function formatDue(due: string) {
   const [y, m, d] = due.split('-').map(Number)
@@ -54,7 +54,7 @@ export function CardView({ card, dispatch, onOpen, overlay }: Props) {
         <div className="card-meta">
           {card.priority && <span className={`badge ${card.priority}`}>{card.priority}</span>}
           {card.due && (
-            <span className={`due${card.due < today() ? ' overdue' : ''}`}>
+            <span className={`due${card.due < todayString() ? ' overdue' : ''}`}>
               <CalendarIcon />
               {formatDue(card.due)}
             </span>

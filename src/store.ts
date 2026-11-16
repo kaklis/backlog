@@ -21,6 +21,7 @@ export type Priority = 'low' | 'medium' | 'high'
 export interface Column {
   id: string
   name: string
+  wipLimit?: number // soft limit on active (non-archived) cards; exceeding it only warns
 }
 export interface BoardState {
   columns: Column[]
@@ -38,6 +39,7 @@ export type Action =
   | { type: 'moveCard'; id: string; columnId: string; overId?: string; transient?: boolean }
   | { type: 'addColumn'; name: string }
   | { type: 'renameColumn'; id: string; name: string }
+  | { type: 'setWipLimit'; id: string; limit?: number }
   | { type: 'deleteColumn'; id: string }
   | { type: 'replace'; state: BoardState }
 
@@ -90,7 +92,8 @@ export function parseBoard(data: unknown): BoardState {
   }
   const columns = data.columns.map((c): Column => {
     if (!isObj(c) || typeof c.id !== 'string' || typeof c.name !== 'string') throw new Error('Invalid column entry.')
-    return { id: c.id, name: c.name }
+    const limit = typeof c.wipLimit === 'number' && Number.isInteger(c.wipLimit) && c.wipLimit > 0 ? c.wipLimit : undefined
+    return { id: c.id, name: c.name, wipLimit: limit }
   })
   const ids = new Set(columns.map((c) => c.id))
   if (ids.size !== columns.length) throw new Error('Duplicate column ids.')
@@ -162,6 +165,10 @@ export function reducer(s: BoardState, a: Action): BoardState {
       return { ...s, columns: [...s.columns, { id: uid(), name: a.name }] }
     case 'renameColumn':
       return { ...s, columns: s.columns.map((c) => (c.id === a.id ? { ...c, name: a.name } : c)) }
+    case 'setWipLimit':
+      return s.columns.find((c) => c.id === a.id)?.wipLimit === a.limit
+        ? s
+        : { ...s, columns: s.columns.map((c) => (c.id === a.id ? { ...c, wipLimit: a.limit } : c)) }
     case 'deleteColumn':
       return {
         columns: s.columns.filter((c) => c.id !== a.id),

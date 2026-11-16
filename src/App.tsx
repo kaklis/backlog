@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core'
 import { parseBoard, useBoard, type Action, type Card, type Dispatch, type Priority } from './store'
 import { usePersisted, useTheme } from './hooks'
+import { matchesDue, type DueFilter } from './dates'
 import { ColumnView } from './components/Column'
 import {
   ArchiveIcon, BoardIcon, DownloadIcon, KeyboardIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, UploadIcon,
@@ -32,6 +33,7 @@ const byDue = (a: Card, b: Card) => (a.due ?? '9999').localeCompare(b.due ?? '99
 
 const FILTERS: Filter[] = ['all', 'high', 'medium', 'low', 'none']
 const SORTS: Sort[] = ['manual', 'priority', 'due']
+const DUE_FILTERS: DueFilter[] = ['any', 'overdue', 'today', 'week', 'none']
 const KEY_PRIORITY: Record<string, Priority | undefined> = { '1': 'high', '2': 'medium', '3': 'low', '0': undefined }
 
 // what the undo toast says after an undoable change
@@ -70,6 +72,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [filter, setFilter] = usePersisted<Filter>('backlog.filter', 'all', FILTERS)
   const [sort, setSort] = usePersisted<Sort>('backlog.sort', 'manual', SORTS)
+  const [dueFilter, setDueFilter] = usePersisted<DueFilter>('backlog.due', 'any', DUE_FILTERS)
   const [query, setQuery] = useState('')
   const [tagFilter, setTagFilter] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
@@ -95,6 +98,7 @@ export default function App() {
       .filter((c) => c.columnId === columnId)
       .filter((c) => !q || c.title.toLowerCase().includes(q) || c.tags?.some((t) => t.toLowerCase().includes(q)))
       .filter((c) => !tagFilter || c.tags?.includes(tagFilter))
+      .filter((c) => matchesDue(dueFilter, c.due))
       .filter((c) => filter === 'all' || (filter === 'none' ? !c.priority : c.priority === filter))
     if (sort === 'priority') cards.sort(byPriority)
     if (sort === 'due') cards.sort(byDue)
@@ -306,6 +310,14 @@ export default function App() {
             <option value="low">Low priority</option>
             <option value="none">No priority</option>
           </select>
+          <select className="field" aria-label="Filter by due date" value={dueFilter}
+            onChange={(e) => setDueFilter(e.target.value as DueFilter)}>
+            <option value="any">Any due date</option>
+            <option value="overdue">Overdue</option>
+            <option value="today">Due today</option>
+            <option value="week">Due this week</option>
+            <option value="none">No due date</option>
+          </select>
           {allTags.length > 0 && (
             <select className="field" aria-label="Filter by tag" value={allTags.includes(tagFilter) ? tagFilter : ''}
               onChange={(e) => setTagFilter(e.target.value)}>
@@ -373,6 +385,7 @@ export default function App() {
               onOpen={open}
               cards={visibleCards(col.id)}
               totalCount={state.cards.filter((c) => c.columnId === col.id).length}
+              activeCount={live.filter((c) => c.columnId === col.id).length}
             />
           ))}
           <button className="add-col" onClick={() => dispatch({ type: 'addColumn', name: 'New column' })}>
