@@ -374,3 +374,15 @@ button.count:hover { background: color-mix(in oklab, var(--text) 13%, transparen
 .menu-list > button { justify-content: flex-start; }
 .small { font-size: 12px !important; }
 .dot.off { background: var(--faint); }
+
+/* ---------- passcode lock ---------- */
+.lock-screen { min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
+.lock-card {
+  width: min(340px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 24px; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg);
+}
+.lock-card .dialog-heading { color: var(--text); }
+.lock-card .field { height: 34px; width: 100%; }
+.lock-error { margin: 0; font-size: 13px; color: var(--high-text); }
+.menu-panel form { display: flex; flex-direction: column; gap: 8px; }
+.menu-panel .field { height: 32px; width: 100%; }

@@ -28,6 +28,7 @@ import { backupSupported, useFileBackup } from './backup'
 import { useBoards, storageKeyFor, type Boards } from './boards'
 import { boardToCsv, importCsv } from './csv'
 import { BoardSwitcher } from './components/BoardSwitcher'
+import { PasscodeMenu } from './components/PasscodeMenu'
 import { DataMenu } from './components/DataMenu'
 import { ViewsMenu } from './components/ViewsMenu'
 
@@ -422,6 +423,7 @@ function BoardView({ boards }: { boards: Boards }) {
               e.target.value = '' // allow re-importing the same file
             }}
           />
+          <PasscodeMenu />
           <button className="icon square" onClick={() => setShowHelp(true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
             <KeyboardIcon />
           </button>
